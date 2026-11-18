@@ -1,0 +1,39 @@
+{
+  "name": "mahjong-playground",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "tools/*"
+  ],
+  "engines": {
+    "node": ">=22.6"
+  },
+  "scripts": {
+    "test": "node --experimental-test-isolation=none --test packages/core/tests packages/app/tests",
+    "typecheck": "tsc --noEmit",
+    "dev": "vite packages/app",
+    "build": "vite build packages/app",
+    "preview": "vite preview packages/app",
+    "check:ui": "tsc -p tsconfig.ssr.json && node scripts/ssr-check.mjs",
+    "check:parity": "python tools/torch/parity.py && node scripts/nn-parity.mjs",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs}\"",
+    "snapshot": "tsc -p tsconfig.ssr.json && node scripts/preview.mjs",
+    "eval": "node scripts/eval.ts",
+    "train:gen": "node tools/train/gen.ts",
+    "train:analyze": "node tools/train/analyze.ts",
+    "train": "node tools/train/train.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.12.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "prettier": "^3.10.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "~5.7.3",
+    "vite": "^7.0.0"
+  }
+}

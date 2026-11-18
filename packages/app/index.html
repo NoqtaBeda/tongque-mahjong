@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>铜雀 · 人机对战</title>
+    <script>
+      // 每次部署后资源文件名（hash）都会变，而 index.html 会被浏览器 / GitHub Pages
+      // 缓存一小段时间（Pages 是 max-age=600）。拿到旧 HTML 就会去请求已经不存在的
+      // 旧脚本，结果只剩 CSS 的背景色、页面空白。
+      //
+      // 这里监听模块脚本加载失败，带时间戳参数强制刷新一次；用 sessionStorage 记一下，
+      // 避免真的缺文件时无限刷新。
+      (function () {
+        var KEY = 'tongque/reloaded-for-stale-assets';
+        try {
+          if (sessionStorage.getItem(KEY) === '1') return;
+        } catch (error) {
+          return;
+        }
+        window.addEventListener(
+          'error',
+          function (event) {
+            var target = event.target;
+            if (!target || target.tagName !== 'SCRIPT') return;
+            try {
+              sessionStorage.setItem(KEY, '1');
+            } catch (error) {
+              return;
+            }
+            var url = new URL(location.href);
+            url.searchParams.set('v', String(Date.now()));
+            location.replace(url.toString());
+          },
+          true,
+        );
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

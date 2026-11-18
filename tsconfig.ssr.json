@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": ".ssr",
+    "rootDir": ".",
+    "rewriteRelativeImportExtensions": true,
+    "declaration": false,
+    "sourceMap": false,
+    "noUnusedLocals": false
+  },
+  "include": [
+    "packages/app/src/App.tsx",
+    "packages/app/src/GameView.tsx",
+    "packages/app/src/storage.ts",
+    "packages/app/src/sound.ts",
+    "packages/core/src/**/*.ts"
+  ]
+}

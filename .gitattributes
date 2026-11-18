@@ -1,0 +1,13 @@
+# 换行符统一为 LF（跨平台一致，避免 Windows 上的 CRLF 混进仓库）
+* text=auto eol=lf
+
+# 图片素材不做换行转换
+*.svg -text
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary

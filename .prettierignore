@@ -1,0 +1,12 @@
+# 依赖、构建产物、训练数据与预览快照
+node_modules/
+.ssr/
+.data/
+.npm-cache/
+packages/app/preview/
+packages/app/dist/
+
+# 非前端资源
+assets/
+packages/app/public/
+*.md
