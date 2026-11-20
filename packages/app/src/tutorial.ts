@@ -63,7 +63,7 @@ export const RULE_INTRO: readonly {
     title: '计分',
     lines: [
       '和牌得分 S：达成 ≥ 12 分的番种时取其中最大的一个；否则把所有番种累加，封顶 12。',
-      '包含关系不计：若番种甲必然包含番种乙，则乙的分值不另计（例如三连刻不另计二连刻）。',
+      '包含关系不计：若番种甲必然包含番种乙，则乙的分值不另计（例如四连刻不另计三连刻）。',
       '自摸：和牌者 +S，其他人不变。',
       '铳和：和牌者 +S，放铳者 −P，其中 P 取 A − 2, 0, 12 三者的中间值，A 是「含铳牌」的番种分值之和。',
     ],
@@ -245,7 +245,7 @@ export const TUTORIAL_SECTIONS: readonly TutorialSection[] = [
         description: '手牌中有两个数字相等的刻子。可复计。',
         examples: [
           {
-            scoring: '碰碰和 2 + 二同刻 1 + 二同刻 1 + 二连刻 1 ＝ 5 分',
+            scoring: '碰碰和 2 + 二同刻 1 + 二同刻 1 ＝ 4 分',
             groups: ['111m', '111p', '222p', '222s', '44z'],
           },
         ],
@@ -324,12 +324,12 @@ export const TUTORIAL_SECTIONS: readonly TutorialSection[] = [
       {
         key: 'sanbugao',
         name: '三步高',
-        points: 4,
+        points: 3,
         kind: '组合',
         description: '手牌中有同花色、起点相差 1 的三个顺子。',
         examples: [
           {
-            scoring: '清一色 6 + 三连环 2 + 三步高 4 ＝ 12 分',
+            scoring: '清一色 6 + 三连环 2 + 三步高 3 ＝ 11 分',
             groups: ['123m', '234m', '345m', '567m', '99m'],
           },
         ],
@@ -388,24 +388,11 @@ export const TUTORIAL_SECTIONS: readonly TutorialSection[] = [
         ],
       },
       {
-        key: 'erlianke',
-        name: '二连刻',
-        points: 1,
-        kind: '组合',
-        description: '手牌中有同花色、数字递增 1 的两个刻子。可复计。',
-        examples: [
-          {
-            scoring: '碰碰和 2 + 二连刻 1 + 二连刻 1 ＝ 4 分',
-            groups: ['111m', '222m', '333s', '444s', '55z'],
-          },
-        ],
-      },
-      {
         key: 'sanlianke',
         name: '三连刻',
         points: 6,
         kind: '组合',
-        description: '手牌中有同花色、数字递增 1 的三个刻子。不另计二连刻。',
+        description: '手牌中有同花色、数字递增 1 的三个刻子。',
         examples: [
           {
             scoring: '缺一门 1 + 一色三同顺 8 ＝ 9 分',
@@ -419,7 +406,7 @@ export const TUTORIAL_SECTIONS: readonly TutorialSection[] = [
         points: 16,
         kind: '组合',
         description:
-          '手牌中有同花色、数字递增 1 的四个刻子。不另计碰碰和、二连刻、三连刻。',
+          '手牌中有同花色、数字递增 1 的四个刻子。不另计碰碰和、三连刻。',
         examples: [
           {
             scoring: '清一色 6 + 四连刻 16 ＝ 16 分（取最大单番）',
@@ -440,7 +427,7 @@ export const TUTORIAL_SECTIONS: readonly TutorialSection[] = [
         description: '手牌中只有数牌，且最大值 − 最小值 = 4。',
         examples: [
           {
-            scoring: '缺一门 1 + 聚五数 1 + 三步高 4 ＝ 6 分',
+            scoring: '缺一门 1 + 聚五数 1 + 三步高 3 ＝ 5 分',
             groups: ['123m', '234m', '345m', '123p', '55p'],
           },
         ],
@@ -448,12 +435,12 @@ export const TUTORIAL_SECTIONS: readonly TutorialSection[] = [
       {
         key: 'jusishu',
         name: '聚四数',
-        points: 2,
+        points: 3,
         kind: '全体',
         description: '手牌中只有数牌，且最大值 − 最小值 = 3。',
         examples: [
           {
-            scoring: '聚四数 2 ＝ 2 分',
+            scoring: '聚四数 3 ＝ 3 分',
             groups: ['234m', '345p', '234s', '345m', '55m'],
           },
         ],
@@ -480,7 +467,7 @@ export const TUTORIAL_SECTIONS: readonly TutorialSection[] = [
         examples: [
           {
             scoring:
-              '聚两数 24 + 碰碰和 2 + 二同刻 1 + 小三色同刻 2 + 二连刻 1 ＝ 24 分（取最大单番）',
+              '聚两数 24 + 碰碰和 2 + 二同刻 1 + 小三色同刻 2 ＝ 24 分（取最大单番）',
             groups: ['444m', '555p', '444s', '555m', '44p'],
           },
         ],
@@ -506,13 +493,13 @@ export const TUTORIAL_SECTIONS: readonly TutorialSection[] = [
       {
         key: 'jingtong',
         name: '镜同',
-        points: 2,
+        points: 3,
         kind: '组合',
         description:
           '四副面子（A1、A2、B1、B2）只含恰好两种花色的数字牌，\n其中 A1/A2、B1/B2 分别同花色、A1/B1、A2/B2 分别数字相同。',
         examples: [
           {
-            scoring: '二同刻 1 + 镜同 2 ＝ 3 分',
+            scoring: '二同刻 1 + 镜同 3 ＝ 4 分',
             groups: ['123s', '555s', '123p', '555p', '44z'],
           },
         ],
@@ -553,13 +540,13 @@ export const TUTORIAL_SECTIONS: readonly TutorialSection[] = [
       {
         key: 'hun-yaojiu',
         name: '混幺九',
-        points: 8,
+        points: 6,
         kind: '全体',
         description:
-          '手牌中仅有幺九牌（数字 1、数字 9、字牌）的刻子和对子，且包含字牌。\n不另计混全带幺九、碰碰和、七对子。',
+          '手牌中仅有幺九牌（数字 1、数字 9、字牌）的刻子和对子，且包含字牌。\n不另计混全带幺九。',
         examples: [
           {
-            scoring: '二同刻 1 + 混幺九 8 ＝ 9 分',
+            scoring: '碰碰和 2 + 二同刻 1 + 混幺九 6 ＝ 9 分',
             groups: ['111m', '999p', '222z', '999s', '11z'],
           },
         ],
@@ -570,11 +557,11 @@ export const TUTORIAL_SECTIONS: readonly TutorialSection[] = [
         points: 24,
         kind: '全体',
         description:
-          '手牌中仅有幺九数牌（数字 1、数字 9）的刻子和对子，其中不含字牌。\n不另计纯全带幺九、碰碰和。',
+          '手牌中仅有幺九数牌（数字 1、数字 9）的刻子和对子，其中不含字牌。\n不另计纯全带幺九。',
         examples: [
           {
             scoring:
-              '二同刻 1 + 小三色同刻 2 + 镜同 2 + 清幺九 24 ＝ 24 分（取最大单番）',
+              '碰碰和 2 + 二同刻 1 + 小三色同刻 2 + 镜同 3 + 清幺九 24 ＝ 24 分（取最大单番）',
             groups: ['111m', '999m', '111p', '999p', '11s'],
           },
         ],
@@ -709,12 +696,12 @@ export const TUTORIAL_SECTIONS: readonly TutorialSection[] = [
       {
         key: 'shisansan',
         name: '十三幺',
-        points: 13,
+        points: 8,
         kind: '特殊',
         description: '十三种幺九牌各一张，其中一种成对。计入铳责。',
         examples: [
           {
-            scoring: '十三幺 13 ＝ 13 分（取最大单番）',
+            scoring: '十三幺 8 ＝ 8 分',
             groups: ['19m19p19s1z2z3z4z5z6z7z', '1m'],
           },
         ],
@@ -824,6 +811,8 @@ export function countsForGate(item: TutorialYaku): boolean {
 export interface TutorialOverviewRow {
   readonly points: number;
   readonly items: readonly TutorialYaku[];
+  /** 这一行全是「不能用于起和」的番种（界面上会在数字左侧加 info 图标） */
+  readonly gateExcluded?: boolean;
 }
 
 /**
@@ -837,13 +826,17 @@ export const TUTORIAL_OVERVIEW: readonly TutorialOverviewRow[] = (() => {
     if (items === undefined) byPoints.set(item.points, [item]);
     else items.push(item);
   }
-  return [...byPoints.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([points, items]) => ({
-      points,
-      // 同一档内把「不计入 2 番起和」的排到最后
-      items: [...items].sort(
-        (a, b) => Number(!countsForGate(a)) - Number(!countsForGate(b)),
-      ),
-    }));
+  const rows: TutorialOverviewRow[] = [];
+  for (const [points, items] of [...byPoints.entries()].sort(
+    (a, b) => a[0] - b[0],
+  )) {
+    const gate = items.filter((item) => countsForGate(item));
+    const excluded = items.filter((item) => !countsForGate(item));
+    // 「不能起和」的那部分单独一行放在前面，便于一眼看出哪些番种凑不出 2 番
+    if (excluded.length > 0) {
+      rows.push({ points, items: excluded, gateExcluded: true });
+    }
+    if (gate.length > 0) rows.push({ points, items: gate });
+  }
+  return rows;
 })();

@@ -5,7 +5,12 @@
  * 而"刷新后该不该接着上一局"这种判断正是最需要测试的地方。
  */
 import { createGame, reduce } from '../../core/src/index.ts';
-import type { Action, GameState, RuleConfig } from '../../core/src/index.ts';
+import type {
+  Action,
+  GameState,
+  RngState,
+  RuleConfig,
+} from '../../core/src/index.ts';
 
 export interface Session {
   readonly state: GameState;
@@ -15,7 +20,10 @@ export interface Session {
   readonly log: readonly Action[];
 }
 
-export function newSession(cfg: RuleConfig, seed: number): Session {
+export function newSession(
+  cfg: RuleConfig,
+  seed: number | bigint | string | RngState,
+): Session {
   const state = createGame(cfg, seed);
   return { state, roundStart: state, log: [] };
 }

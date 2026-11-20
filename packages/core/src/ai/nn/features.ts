@@ -20,6 +20,24 @@ export interface EncodeInput {
   readonly ukeire: number;
   /** 手写启发式的番种潜力（0..12） */
   readonly potential: number;
+  /**
+   * 对手威胁 / 牌河节奏（P1）。缺省时对应维度填 0，
+   * 这样旧的调用方不传也能跑（只是那 7 维没有信息量）。
+   */
+  readonly threat?: ThreatInput;
+}
+
+export interface ThreatInput {
+  /** 每家副露的组数（下标是座位号） */
+  readonly oppMelds: readonly number[];
+  /** 每家牌河的张数 */
+  readonly oppDiscards: readonly number[];
+  /** 自己以外所有牌河的摸切比例 0..1 */
+  readonly tsumogiriRatio: number;
+  /** 手牌里"孤张"（同花色 ±2 内没有别的牌）的张数 */
+  readonly isolated: number;
+  /** 手牌平均危险度 0..1：他家牌河里出现过的同种牌越多越危险 */
+  readonly danger: number;
 }
 
 const MELD_KINDS: readonly Meld['kind'][] = [
@@ -63,7 +81,6 @@ export function encodeInput(input: EncodeInput): Float32Array {
     out[cursor] = count / 4;
     cursor += 1;
   }
-
   // 73.. 上下文
   out[cursor] = Math.max(0, input.shanten) / 8;
   cursor += 1;

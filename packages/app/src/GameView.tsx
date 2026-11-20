@@ -794,7 +794,9 @@ export function TutorialDialog({ onClose }: { readonly onClose: () => void }) {
           <table className="tut-overview">
             <tbody>
               {TUTORIAL_OVERVIEW.map((row) => (
-                <tr key={`overview-${row.points}`}>
+                <tr
+                  key={`overview-${row.points}-${row.gateExcluded === true ? 'excluded' : 'gate'}`}
+                >
                   <td
                     className="tut-overview-points"
                     style={
@@ -803,6 +805,16 @@ export function TutorialDialog({ onClose }: { readonly onClose: () => void }) {
                       } as React.CSSProperties
                     }
                   >
+                    {row.gateExcluded === true && (
+                      <span
+                        className="tut-overview-info"
+                        title="不计入 2 番起和"
+                        aria-label="不计入 2 番起和"
+                        role="img"
+                      >
+                        i
+                      </span>
+                    )}
                     {row.points}
                   </td>
                   <td className="tut-overview-names">

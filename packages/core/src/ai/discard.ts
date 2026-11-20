@@ -11,6 +11,9 @@ import {
   predictValueWith,
 } from './nn/value.ts';
 import type { MlpWeights } from './nn/mlp.ts';
+import { policyLogits } from './nn/policy.ts';
+import { encodeInput } from './nn/features.ts';
+import type { PolicyWeights } from './nn/policy.ts';
 import { biasScoreOf, scoreProspects, yakuProspects } from './potential.ts';
 import { dangerTable } from './defense.ts';
 import type { BiasGate, YakuBias } from './potential.ts';
@@ -43,6 +46,13 @@ export interface DiscardWeights {
   readonly meldPotential?: number;
   /** 鸣牌需要超过的价值门槛，避免为小便宜拆掉门清 */
   readonly meldMargin?: number;
+  /** 策略头 logit 的权重；0 表示不用策略头 */
+  readonly policyWeight?: number;
+  /**
+   * 可用网络预期得分替代手写潜力来判定「这手能不能到 2 分」。
+   * >0 时：网络输出 ≥ 该值也算够起和（手写潜力对一色/大番经常低估）。
+   */
+  readonly winPathFromNn?: number;
 }
 
 /**
@@ -88,6 +98,8 @@ export interface DiscardOptions {
   readonly yakuBias?: YakuBias;
   /** 指定网络权重（A/B 实验用），不传就用线上权重 */
   readonly nnWeights?: MlpWeights | readonly MlpWeights[];
+  /** 策略头（P0）：给每张候选牌一个 logit，按 policyWeight 加进价值里 */
+  readonly policyWeights?: PolicyWeights;
   /** 条件偏好（一色组合类），不传表示全部无条件生效 */
   readonly biasGate?: BiasGate;
   /** 整局观察，用于放铳风险评估；不传则跳过防守项 */
@@ -169,6 +181,15 @@ export function rankDiscards(
             ? predictValueEnsemble(options.nnWeights, nnInput)
             : predictValueWith(options.nnWeights as MlpWeights, nnInput);
     const potential = options.valueModel === 'nn' ? nnValue : heuristic;
+    // 策略头：输入同样是"打完这张之后"的状态（和 nnValue 共用 nnInput）
+    const policyWeight = weights.policyWeight ?? 0;
+    const policyBonus =
+      policyWeight !== 0 &&
+      options.policyWeights !== undefined &&
+      nnInput !== null
+        ? policyLogits(options.policyWeights, encodeInput(nnInput))[tile] *
+          policyWeight
+        : 0;
     const nnBonus =
       options.valueModel === 'heuristic+nn' ? nnValue * weights.nnBonus : 0;
     const deep =
@@ -195,7 +216,11 @@ export function rankDiscards(
       potential * weights.potential +
       bias * weights.potential +
       nnBonus +
-      (heuristic >= MIN_WIN_POINTS ? weights.winPath : 0) +
+      policyBonus +
+      (heuristic >= MIN_WIN_POINTS ||
+      (weights.winPathFromNn !== undefined && nnValue >= weights.winPathFromNn)
+        ? weights.winPath
+        : 0) +
       deep * lookaheadWeight -
       loss * (weights.defense ?? 0);
 

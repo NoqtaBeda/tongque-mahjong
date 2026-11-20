@@ -86,13 +86,12 @@ describe('拆解枚举', () => {
 });
 
 describe('蕴含剔除', () => {
-  it('四连刻同时剔除二连刻、三连刻、碰碰和', () => {
+  it('四连刻同时剔除三连刻、碰碰和', () => {
     const r = evaluate('111m 222m 333m 444m 55m', '4m');
     assert.ok(r.best !== null);
     const keys = r.best.hits.map((hit) => hit.key);
     assert.ok(keys.includes('silianke'));
     assert.ok(!keys.includes('sanlianke'));
-    assert.ok(!keys.includes('erlianke'));
     assert.ok(!keys.includes('pengpenghe'));
   });
 
@@ -108,14 +107,14 @@ describe('蕴含剔除', () => {
     );
   });
 
-  it('传递闭包：四连刻 ⇒ 二连刻 不依赖中间项是否被剔除', () => {
+  it('传递闭包：四步高 ⇒ 三步高 不依赖中间项是否被剔除', () => {
     const dropped = dropImplied([
-      fakeHit('silianke', 16, 0b1111),
-      fakeHit('erlianke', 1, 0b0011),
+      fakeHit('sibugao', 12, 0b1111),
+      fakeHit('sanbugao', 3, 0b0111),
     ]);
     assert.deepEqual(
       dropped.map((hit) => hit.key),
-      ['silianke'],
+      ['sibugao'],
     );
   });
 });

@@ -1,5 +1,17 @@
 export { handGroups } from './groups.ts';
 export {
+  RNG_MODE,
+  describeRng,
+  drawRng,
+  isRng,
+  nextRng,
+  nextRngBigInt,
+  randomRng,
+  toRng,
+} from './rng.ts';
+export type { RngMode } from './rng.ts';
+export type { RngState } from './rng.ts';
+export {
   createGame,
   legalActions,
   observe,

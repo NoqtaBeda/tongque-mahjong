@@ -1,6 +1,7 @@
 import type { DiscardWeights } from './discard.ts';
 import type { BiasGate, YakuBias } from './potential.ts';
 import type { MlpWeights } from './nn/mlp.ts';
+import type { PolicyWeights } from './nn/policy.ts';
 import { DEFAULT_WEIGHTS } from './discard.ts';
 
 export type AiLevel = 'advanced';
@@ -17,6 +18,8 @@ export interface AiProfile {
   readonly lookaheadWeight: number;
   /** 前瞻时展开的进张分支数（越大越准越慢） */
   readonly branch: number;
+  /** 策略头（P0）：每张候选打牌一个 logit，按 weights.policyWeight 加进价值里 */
+  readonly policyWeights?: PolicyWeights;
   /** 对指定番种的额外偏好（三色 / 一色类），undefined 表示不偏 */
   readonly yakuBias?: YakuBias;
   /** 条件偏好：满足条件的那批番种才额外加权 */
@@ -41,7 +44,11 @@ export interface AiProfile {
  */
 export const ADVANCED_WEIGHTS: DiscardWeights = {
   ...DEFAULT_WEIGHTS,
-  potential: 6000,
+  // 2026-11-20 番种表调整后重扫（4 万局配对 A/B，SE≈0.04）：
+  //   6000 → 基准   9000 → +0.12（z=2.9）   12000 → +0.12（z=3.4）   16000 → +0.14（z=3.0）
+  // 峰值在 12000 附近。原因：十三幺 13→8、混幺九 8→6、三步高 4→3、删除二连刻，
+  // 手写潜力体系的绝对分值整体缩水，网络项需要更大权重才能保持量纲平衡。
+  potential: 12000,
   // 放铳风险权重。**实测是负收益**：
   //   - 强强对拼 2400 局：开 6000 的一方每局少 0.86 分（SE≈0.22），
   //     200~600 局的小样本曾出现 +1.1 的假象，是噪声。
@@ -75,18 +82,18 @@ export const AI_PROFILES: Readonly<Record<AiLevel, AiProfile>> = {
     //   平均打点 3.41 → 3.75      和牌率 73.3% → 71.4%（~1 SE）
     //   同桌对抗（400 番）：−0.21 分/番，194 胜 / 189 负 —— 统计上与基线持平
     yakuBias: {
-      'sanse-tongshun': 1.65,
-      qingyise: 1.25,
-      hunyise: 1.2,
+      // 2026-11-20：pw 提到 12000 后，旧偏好（1.2~1.65）在 24000 局下是 −0.36 分/局；
+      // 实测「轻偏好」（≈1.15）与完全关闭无差异（−0.02，噪声内），所以只保留三色/清龙/三连环的轻偏好。
+      // 注意 biasScoreOf 里 weight ≤ 1 等于关闭，不要写 0.x 的值（会静默失效）。
+      'sanse-tongshun': 1.16,
       // 一色组合类：只在单色手牌里追（见 biasGate）
-      qinglong: 1.6,
-      sanlianhuan: 1.6,
-      sanbugao: 1.4,
+      qinglong: 1.12,
+      sanlianhuan: 1.12,
     },
     biasGate: {
       requires: 'qingyise',
       minProgress: 0.5,
-      keys: ['qinglong', 'sanlianhuan', 'sanbugao'],
+      keys: ['qinglong', 'sanlianhuan'],
     },
   },
 };

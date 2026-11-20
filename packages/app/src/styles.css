@@ -1,3 +1,59 @@
+/* ---------------------------------------------------------------- 加载界面 */
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg, #101615);
+  z-index: 50;
+}
+
+.loading-card {
+  width: min(360px, 100%);
+  text-align: center;
+}
+
+.loading-title {
+  margin: 0 0 6px;
+  font-size: 30px;
+  letter-spacing: 8px;
+  font-weight: 700;
+  color: var(--accent, #7c9a86);
+}
+
+.loading-sub {
+  margin: 0 0 18px;
+  font-size: 13px;
+  opacity: 0.72;
+}
+
+.loading-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.loading-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent, #7c9a86);
+  transition: width 0.18s ease-out;
+}
+
+.loading-count {
+  margin: 12px 0 0;
+  font-size: 12px;
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+
+.loading-failed {
+  margin-left: 4px;
+  opacity: 0.8;
+}
 :root {
   --bg: #0d1713;
   --panel: #17261f;
@@ -1646,6 +1702,24 @@ button.ghost {
   border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
 }
 
+/* 「不能用于起和」那一行：数字左侧的 info 图标 */
+.tut-overview-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-right: 5px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 10px;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1;
+  opacity: 0.7;
+  cursor: help;
+  vertical-align: 2px;
+}
 .tut-overview-points {
   width: 52px;
   text-align: right;

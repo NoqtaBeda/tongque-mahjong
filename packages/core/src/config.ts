@@ -16,6 +16,12 @@ export interface RuleConfig {
   readonly allowChi: boolean;
   /** 牌山末尾保留 14 张王牌，仅用于杠后补牌。 */
   readonly keepDeadWall: boolean;
+  /**
+   * 复式（duplicate）模式：牌山四等分，每人只从自己的那段摸牌，
+   * 杠后补牌从自己那段尾部取；任一玩家需要摸/补而无牌即流局。
+   * 仅用于 A/B 测试的配对对局，不支持三人麻将。
+   */
+  readonly duplicateWalls: boolean;
   readonly allowSevenPairs: boolean;
   /** 七对子是否允许重复对子（龙七对）。 */
   readonly sevenPairsQuadAsTwoPairs: boolean;
@@ -29,6 +35,7 @@ const BASE_CONFIG: RuleConfig = {
   tileSet: 'std136',
   allowChi: true,
   keepDeadWall: true,
+  duplicateWalls: false,
   allowSevenPairs: true,
   sevenPairsQuadAsTwoPairs: false,
   allowThirteenOrphans: true,
@@ -40,14 +47,17 @@ export function makeConfig(overrides: Partial<RuleConfig> = {}): RuleConfig {
   if (!Number.isInteger(merged.rounds) || merged.rounds <= 0) {
     throw new Error(`rounds must be a positive integer, got ${merged.rounds}`);
   }
+  if (merged.duplicateWalls && merged.players !== 4) {
+    throw new Error(`复式牌山只支持四人麻将，收到 players=${merged.players}`);
+  }
   if (merged.rounds % merged.players !== 0) {
     throw new Error(
       `rounds (${merged.rounds}) must be a multiple of players (${merged.players})`,
     );
   }
-  return merged;
+  // 复式把 136 张全部分给四家，不能再留 14 张王牌
+  return merged.duplicateWalls ? { ...merged, keepDeadWall: false } : merged;
 }
-
 /** 风数 = 局数 / 人数（东风 1、半庄 2、三风 3、全庄 4）。 */
 export function windCount(cfg: RuleConfig): number {
   return cfg.rounds / cfg.players;

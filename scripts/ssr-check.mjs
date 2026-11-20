@@ -21,6 +21,8 @@ const core = await import('../.ssr/packages/core/src/index.js');
 const ai = await import('../.ssr/packages/core/src/ai/index.js');
 const { YAKU } = await import('../.ssr/packages/core/src/yaku.js');
 const { TUTORIAL_ITEMS } = await import('../.ssr/packages/app/src/tutorial.js');
+const { LoadingScreen } =
+  await import('../.ssr/packages/app/src/LoadingScreen.js');
 
 const noop = () => {};
 const strip = (html) => html.replace(/<!--[\s\S]*?-->/g, '');
@@ -450,8 +452,8 @@ assert.ok(tutorialHtml.includes('铜雀'), '教程标题应当带上规则名「
 const tutorialBlocks = (tutorialHtml.match(/class="tut-yaku"/g) ?? []).length;
 assert.equal(
   tutorialBlocks,
-  51,
-  `番种表应当有 51 条，实际 ${tutorialBlocks} 条`,
+  50,
+  `番种表应当有 50 条，实际 ${tutorialBlocks} 条`,
 );
 for (const name of Object.values(YAKU).map((yaku) => yaku.name)) {
   assert.ok(tutorialHtml.includes(name), `番种表缺少「${name}」`);
@@ -482,15 +484,21 @@ assert.ok(tutorialHtml.includes('class="tut-overview"'), '教程应有番种一�
 assert.equal(
   (tutorialHtml.match(/class="tut-overview-points"/g) ?? []).length,
   9,
-  '一览表应当有 9 个分值行（1/2/4/6/8/12/13/16/24）',
+  '一览表应当有 9 个分值行（1 分拆成「不能起和」「能起和」两行）',
+);
+// 1 分档里「不能起和」那一行要带 info 图标（且只带一个）
+assert.equal(
+  (tutorialHtml.match(/class="tut-overview-info"/g) ?? []).length,
+  1,
+  '「不能起和」的行应当恰好有一个 info 图标',
 );
 const overviewTags = [
   ...tutorialHtml.matchAll(/class="tut-tag[^"]*"[^>]*>([^<]*)</g),
 ].map((m) => m[1]);
 assert.equal(
   overviewTags.length,
-  51,
-  `一览表应当有 51 个 tag，实际 ${overviewTags.length} 个`,
+  50,
+  `一览表应当有 50 个 tag，实际 ${overviewTags.length} 个`,
 );
 for (const name of Object.values(YAKU).map((yaku) => yaku.name)) {
   assert.ok(overviewTags.includes(name), `一览表缺少「${name}」`);
@@ -835,3 +843,27 @@ console.log(
     `三麻 ${threeHtml.length} 字，鸣牌 ${claimHtml.length} 字，摸牌 ${drawHtml.length} 字，` +
     `记录 ${historyHtml.length} 字`,
 );
+
+// ---------------------------------------------------------------- 加载界面
+const loadingHtml = renderToString(
+  React.createElement(LoadingScreen, {
+    progress: { loaded: 12, total: 34, failed: [] },
+  }),
+);
+assert.ok(
+  loadingHtml.includes('loading-screen'),
+  '加载界面应有 .loading-screen',
+);
+assert.ok(
+  loadingHtml.includes('正在加载牌面素材'),
+  '加载界面应提示正在加载素材',
+);
+assert.ok(
+  loadingHtml.includes('aria-valuenow="35"'),
+  `进度条应按 12/34 显示 35%，实际：${loadingHtml.slice(0, 200)}`,
+);
+assert.ok(
+  textOf(loadingHtml).replace(/\s+/g, ' ').includes('12 / 34'),
+  `加载界面应显示已加载数量，实际：${textOf(loadingHtml)}`,
+);
+console.log('SSR OK：加载界面渲染正常（进度 12/34 → 35%）');

@@ -14,7 +14,7 @@ interface Edge {
 }
 
 /**
- * 规则文档里的"不另计 X"。前 21 条是文档显式声明；
+ * 规则文档里的"不另计 X"。前 15 条是文档显式声明；
  * 其余是由"若达成 A 必然达成 B 则 B 不另计"通则推出、文档未逐条写明的部分
  * （其 A 均为 ≥14 分，数值上已经饱和，仅为结算展示一致而保留）。
  */
@@ -27,16 +27,13 @@ const EDGES: readonly Edge[] = [
   { from: 'silianhuan', to: 'sanlianhuan', mode: 'always' },
   { from: 'sibugao', to: 'sanbugao', mode: 'always' },
   { from: 'yise-sitongshun', to: 'yise-santongshun', mode: 'always' },
-  { from: 'sanlianke', to: 'erlianke', mode: 'always' },
-  { from: 'silianke', to: 'erlianke', mode: 'always' },
+
   { from: 'silianke', to: 'sanlianke', mode: 'always' },
   { from: 'liangbangao', to: 'yibangao', mode: 'always' },
   { from: 'hun-yaojiu', to: 'hun-quan-dai-yaojiu', mode: 'always' },
-  { from: 'hun-yaojiu', to: 'pengpenghe', mode: 'always' },
-  { from: 'hun-yaojiu', to: 'qiduizi', mode: 'always' },
+
   { from: 'qing-yaojiu', to: 'chun-quan-dai-yaojiu', mode: 'always' },
-  { from: 'qing-yaojiu', to: 'pengpenghe', mode: 'always' },
-  { from: 'qing-yaojiu', to: 'qiduizi', mode: 'always' },
+
   { from: 'xiao-sixi', to: 'san-feng-ke', mode: 'always' },
   { from: 'da-sixi', to: 'san-feng-ke', mode: 'always' },
   { from: 'xiao-sanyuan', to: 'sanyuanke', mode: 'always' },
@@ -54,7 +51,7 @@ const EDGES: readonly Edge[] = [
   { from: 'da-sixi', to: 'pengpenghe', mode: 'always' },
 ];
 
-export const EXPLICIT_IMPLICATION_COUNT = 22;
+export const EXPLICIT_IMPLICATION_COUNT = 16;
 
 /** 传递闭包：`REACHES[a].get(c)` 表示 a ⇒ c；多跳路径若含 same-param 边，整条链都要求参数相等。 */
 export const REACHES: ReadonlyMap<

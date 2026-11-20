@@ -1,4 +1,4 @@
-import { KIND_COUNT } from '../../core/src/index.ts';
+import { KIND_COUNT, isRng, toRng } from '../../core/src/index.ts';
 import type { GameState } from '../../core/src/index.ts';
 
 const STORAGE_KEY = 'mahjong-playground/save/v2';
@@ -72,6 +72,11 @@ export function decodeState(raw: string): GameState | null {
   // 摸切标记同理：旧存档没有就按「全是手切」补齐，长度与牌河保持一致
   if (!Array.isArray(state.tsumogiri))
     state.tsumogiri = state.discards.map(() => []);
+  // 随机状态从 32 位（rngState: number）升级到 128 位（rng: [4]）：旧存档用旧种子重建
+  if (!isRng(state.rng)) {
+    const legacy = (candidate as { rngState?: unknown }).rngState;
+    state.rng = toRng(typeof legacy === 'number' ? legacy : 1);
+  }
 
   return state;
 }

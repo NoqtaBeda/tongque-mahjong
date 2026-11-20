@@ -1,6 +1,8 @@
 import type { Hand, Meld } from '../tiles.ts';
 import type { RuleConfig } from '../config.ts';
 import type { PatternResult } from '../evaluate.ts';
+import type { RngState } from './rng.ts';
+import type { SegmentCursor } from './game.ts';
 
 export type Seat = number;
 
@@ -118,8 +120,8 @@ export interface RoundRecord {
 
 export interface GameState {
   cfg: RuleConfig;
-  /** 洗牌用的随机数状态，保证可复现 */
-  rngState: number;
+  /** 洗牌用的随机数状态（xoshiro128**，128 位），保证可复现 */
+  rng: RngState;
   round: number;
   dealer: Seat;
   phase: Phase;
@@ -153,6 +155,12 @@ export interface GameState {
   turnIndex: number;
 
   lastDiscard: { tile: number; from: Seat } | null;
+  /**
+   * 复式模式的每座位牌山游标（普通模式为 undefined）。
+   * `wall` 仍是整副牌，第 s 个座位的牌山是 `wall[start, back]` 这段，
+   * 摸牌从 `front` 往后走、杠补从 `back` 往前走，两者交错即耗尽。
+   */
+  segments?: SegmentCursor[];
   claim: ClaimWindow | null;
   result: RoundResult | null;
   /** 整场分值最高的和牌，跨局保留 */

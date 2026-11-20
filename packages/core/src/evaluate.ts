@@ -51,7 +51,7 @@ export interface WinResult {
 
 /**
  * 剔除被蕴含的番种。
- * 判定基于"原始命中集"而非边剔除边判断，否则 四连刻→三连刻→二连刻 这类链条会断。
+ * 判定基于"原始命中集"而非边剔除边判断，否则 四步高→三步高 这类链条会断。
  */
 export function dropImplied(hits: readonly YakuHit[]): YakuHit[] {
   return hits.filter(

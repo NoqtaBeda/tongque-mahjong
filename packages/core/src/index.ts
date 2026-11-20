@@ -68,12 +68,20 @@ export {
 export type { PatternResult, WinInput, WinResult } from './evaluate.ts';
 
 export {
+  RNG_MODE,
+  describeRng,
+  drawRng,
   handGroups,
   createGame,
+  isRng,
   legalActions,
+  nextRng,
+  nextRngBigInt,
   observe,
+  randomRng,
   reduce,
   startRound,
+  toRng,
   wallRemaining,
   windOf,
 } from './engine/index.ts';
@@ -86,6 +94,7 @@ export type {
   Phase,
   RoundEntryRecord,
   RoundRecord,
+  RngState,
   RoundResult,
   ScoringEntry,
   Seat,

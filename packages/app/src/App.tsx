@@ -34,8 +34,12 @@ import {
   saveView,
 } from './storage.ts';
 import { newSession, resumeSession, step } from './session.ts';
+import { randomRng } from '../../core/src/index.ts';
 import type { Session } from './session.ts';
 import { readMuted, sfx, soundCue, writeMuted } from './sound.ts';
+import { LoadingScreen } from './LoadingScreen.tsx';
+import { allAssetSources, needsPreload, preloadAssets } from './assets.ts';
+import type { AssetProgress } from './assets.ts';
 
 const AI_DELAY_MS = 320;
 const DEFAULT_SEED = 20260101;
@@ -159,6 +163,28 @@ function initialSession(
 }
 
 export function App() {
+  // 浏览器里先把牌面素材全部灌进缓存，再进游戏；SSR/Node 下不需要等
+  const [assets, setAssets] = useState<AssetProgress | null>(() =>
+    needsPreload()
+      ? { loaded: 0, total: allAssetSources().length, failed: [] }
+      : null,
+  );
+
+  useEffect(() => {
+    if (!needsPreload()) return;
+    let alive = true;
+    void preloadAssets((progress) => {
+      if (alive) setAssets(progress);
+    }).then((final) => {
+      if (alive) setAssets(null);
+      if (final.failed.length > 0) {
+        console.warn('部分素材加载失败：', final.failed);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
   const [keepDeadWall, setKeepDeadWall] = useState<boolean>(() =>
     readKeepDeadWall(),
   );
@@ -244,7 +270,7 @@ export function App() {
     clearState();
     setReplay(null);
     setFinalShown(false);
-    setSession(newSession(session.state.cfg, (Date.now() & 0xffff) | 1));
+    setSession(newSession(session.state.cfg, randomRng()));
   }, [session.state.cfg]);
 
   const openSettings = useCallback(() => {
@@ -287,7 +313,7 @@ export function App() {
     setSession(
       newSession(
         configFromPreset(draftPreset, draftDeadWall, draftDuration, draftChi),
-        (Date.now() & 0xffff) | 1,
+        randomRng(),
       ),
     );
 
@@ -319,6 +345,10 @@ export function App() {
     [replay, session.state],
   );
   const canReplay = session.log.length > 0;
+
+  if (assets !== null) {
+    return <LoadingScreen progress={assets} />;
+  }
 
   if (!started) {
     return (

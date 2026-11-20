@@ -186,12 +186,6 @@ const POSITIVE: readonly CoverageCase[] = [
     why: '四个完全相同的顺子',
   },
   {
-    key: 'erlianke',
-    concealed: '111m 222m 456p 789s 55z',
-    winTile: '5z',
-    why: '同花色连号的两个刻子',
-  },
-  {
     key: 'sanlianke',
     concealed: '444m 555m 666m 444p 55z',
     winTile: '5z',
@@ -468,7 +462,7 @@ describe('番种覆盖：正向构造', () => {
     });
   }
 
-  it('51 个番种全部有正向用例', () => {
+  it('50 个番种全部有正向用例', () => {
     const covered = new Set(POSITIVE.map((testCase) => testCase.key));
     const missing = YAKU_TABLE.map((def) => def.key).filter(
       (key) => !covered.has(key),
@@ -478,7 +472,7 @@ describe('番种覆盖：正向构造', () => {
       [],
       `以下番种缺少正向用例：${missing.join(', ')}`,
     );
-    assert.equal(YAKU_TABLE.length, 51, '番种表应有 51 条');
+    assert.equal(YAKU_TABLE.length, 50, '番种表应有 50 条');
   });
 
   it('正向用例的 key 没有重复定义以外的冗余', () => {

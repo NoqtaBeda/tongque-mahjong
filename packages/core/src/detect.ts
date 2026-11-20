@@ -392,10 +392,6 @@ function detectSameSuitTriplets(
   for (let suit = 0; suit < 3; suit += 1) {
     const base = suit * 9;
 
-    for (let from = 0; from <= 7; from += 1) {
-      const picked = pickStarts(tripletByKind, [base + from, base + from + 1]);
-      if (picked !== null) hits.push(makeHit('erlianke', bitsOf(picked)));
-    }
     for (let from = 0; from <= 6; from += 1) {
       const picked = pickStarts(tripletByKind, [
         base + from,

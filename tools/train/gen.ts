@@ -1,9 +1,21 @@
 // 生成训练样本：用当前启发式 AI 自对弈，记录每个决策点的特征，
 // 并在本场结束时用「该座位的净得分变化」当标签（蒙特卡洛价值）。
 //
-// 用法：node tools/train/gen.ts --games=800 [--preset=4p] [--out=.data/samples.bin]
-import { mkdirSync, writeFileSync } from 'node:fs';
+// 用法：
+//   node tools/train/gen.ts --games=800 [--preset=4p] [--out=.data/samples.bin]
+//   node tools/train/gen.ts --games=24000 --jobs=16 --out=.data/samples-x.bin   # 16 片并行
+// 并行时每片写 `xxx.shard<i>.bin`，全部结束后自动合并成一个文件并发完就删分片。
+// 分片的 group id 带高位偏移，合并后训练时按 group 切验证集仍然安全。
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
+import { runShards } from '../../scripts/parallel.ts';
+import { formatSeed, offsetSeed, parseSeed } from '../../scripts/seed.ts';
 import { fileURLToPath } from 'node:url';
 import {
   createGame,
@@ -45,13 +57,51 @@ const PRESET = args.get('preset') ?? '4p';
 // 自对弈用哪一档打牌：数据分布会跟着变，进阶档产的数据更接近它自己会遇到的局面
 const LEVEL = (args.get('level') ?? 'normal') as AiLevel;
 const OUT = args.get('out') ?? join(root, '.data', 'samples.bin');
-const SEED = Number(args.get('seed') ?? 1);
+const SEED = parseSeed(args.get('seed'));
 /**
  * 每本场最多保留多少条样本。
  * 同一本场内的样本共享标签，有效样本量由"本场数"决定，所以按本场抽样不会损失信息，
  * 但能把文件从几个 GB 压到几十 MB。
  */
 const PER_ROUND = Number(args.get('per-round') ?? 6);
+/**
+ * 打牌决策记录「打完之后」的 13 张手牌（默认），而不是「打牌前」的 14 张。
+ *
+ * 实战里 `rankDiscards` 评估的是每个候选打完后的 13 张状态，看的是那时的
+ * 向听 / 进张 / 潜力；以前的样本记的是 14 张（进张中位数能差 10 张以上），
+ * 训练分布和实战分布完全错位。加 `--align=pre` 可以退回旧行为做对照。
+ */
+const ALIGN = args.get('align') ?? 'post';
+/**
+ * ε-探索：以这个概率改成随机打一张（DAgger 思路）。
+ *
+ * 纯贪心自对弈只会覆盖"当前策略会走的局面"，训练集里没有"如果我当时打别的"
+ * 的反事实，价值网络就学不到纠正。加一点随机探索能让数据覆盖更多状态。
+ * 用固定种子的 LCG，保证同样的 seed 生成同样的数据。
+ */
+const EPS = Number(args.get('eps') ?? 0);
+/**
+ * 分片：`--jobs=16` 时把 GAMES 均分给 16 个进程并行跑，各自写 `xxx.shard<i>.bin`，
+ * 最后合并成一个文件。每片的 group id 加一个固定的高位偏移，合并后互不重叠，
+ * 训练时按 group 切验证集仍然安全。
+ */
+const JOBS = Number(args.get('jobs') ?? 1);
+const SHARD = args.get('shard');
+/** 每片 group id 的偏移步长（单片最多 GAMES × 每局本场数，远小于这个数） */
+const GROUP_STRIDE = 10_000_000;
+
+function shardPath(index: number): string {
+  const dot = OUT.lastIndexOf('.');
+  if (dot < 0) return `${OUT}.shard${index}`;
+  return `${OUT.slice(0, dot)}.shard${index}${OUT.slice(dot)}`;
+}
+// 探索用的 LCG 只需要一个 32 位种子；bigint 种子取低 32 位即可
+const seedLow = typeof SEED === 'bigint' ? Number(SEED & 0xffffffffn) : SEED;
+let exploreState = (seedLow ^ 0x9e3779b9) >>> 0;
+function exploreRandom(): number {
+  exploreState = (Math.imul(exploreState, 1664525) + 1013904223) >>> 0;
+  return exploreState / 0x100000000;
+}
 
 const CONFIGS: Record<string, RuleConfig> = {
   '4p': makeConfig({ rounds: 4 }),
@@ -66,10 +116,15 @@ if (cfg === undefined) {
 interface Pending {
   readonly features: Float32Array;
   readonly seat: number;
+  /** 这一步选了什么：0 = 打牌，其它 = 鸣牌/过等；打牌时记录牌种 */
+  readonly discard: number;
 }
-
-const labelled: { features: Float32Array; target: number; group: number }[] =
-  [];
+const labelled: {
+  features: Float32Array;
+  target: number;
+  group: number;
+  discard: number;
+}[] = [];
 const started = Date.now();
 let groupCounter = 0;
 
@@ -106,32 +161,99 @@ function playRound(state: GameState, pending: Pending[]): GameState {
       extractFeatures(observation.hand, melds, observation.seatWind),
     );
 
-    pending.push({
-      seat: actor,
-      features: encodeInput({
-        concealed: observation.hand,
-        melds,
-        visible,
-        seatWind: observation.seatWind,
-        round: current.round,
-        isDealer: current.dealer === actor,
-        wallRemaining: wallRemaining(current),
-        score: current.scores[actor],
-        shanten,
-        ukeire,
-        potential,
-      }),
-    });
+    let action = decide(observation, { profile: profileOf(LEVEL) });
+    if (EPS > 0 && exploreRandom() < EPS) {
+      const discards = legal.filter((item) => item.type === 'discard');
+      if (discards.length > 0) {
+        action = discards[Math.floor(exploreRandom() * discards.length)];
+      }
+    }
 
-    current = reduce(
-      current,
-      decide(observation, { profile: profileOf(LEVEL) }),
-    );
+    if (ALIGN === 'post' && action.type === 'discard') {
+      // 记「打完这张之后」的状态，和 rankDiscards 评估候选时看到的完全一致
+      const after = observation.hand.slice();
+      after[action.tile] -= 1;
+      pending.push({
+        seat: actor,
+        discard: action.tile,
+        features: encodeInput({
+          concealed: after,
+          melds,
+          visible,
+          seatWind: observation.seatWind,
+          round: current.round,
+          isDealer: current.dealer === actor,
+          wallRemaining: wallRemaining(current),
+          score: current.scores[actor],
+          shanten: shantenOf(after, melds.length, cfg).value,
+          ukeire: improvingTiles(after, melds, cfg, visible).count,
+          potential: potentialScore(
+            extractFeatures(after, melds, observation.seatWind),
+          ),
+        }),
+      });
+    } else {
+      pending.push({
+        seat: actor,
+        discard: -1,
+        features: encodeInput({
+          concealed: observation.hand,
+          melds,
+          visible,
+          seatWind: observation.seatWind,
+          round: current.round,
+          isDealer: current.dealer === actor,
+          wallRemaining: wallRemaining(current),
+          score: current.scores[actor],
+          shanten,
+          ukeire,
+          potential,
+        }),
+      });
+    }
+
+    current = reduce(current, action);
   }
 }
 
-for (let game = 0; game < GAMES; game += 1) {
-  let state = createGame(cfg, SEED + game);
+// 分片时只跑属于自己那一段；合并后的样本与单进程完全等价
+const shardIndex = SHARD === undefined ? 0 : Number(SHARD.split('/')[0]);
+const shardCount = SHARD === undefined ? 1 : Number(SHARD.split('/')[1]);
+const perShard = Math.ceil(GAMES / shardCount);
+const firstGame = shardIndex * perShard;
+const lastGame = Math.min(GAMES, firstGame + perShard);
+if (SHARD !== undefined) groupCounter = -shardIndex * GROUP_STRIDE * -1;
+
+// ── 父进程：--jobs>1 时并发跑分片，全部结束后合并 ──
+if (JOBS > 1 && SHARD === undefined) {
+  const perShardGames = Math.ceil(GAMES / JOBS);
+  const passthrough: string[] = [];
+  for (const [key, value] of args) {
+    if (['jobs', 'shard', 'games', 'seed', 'out'].includes(key)) continue;
+    passthrough.push(`--${key}=${value}`);
+  }
+  console.log(
+    `分片生成：${JOBS} 片 × ${perShardGames} 局（共 ${GAMES} 局）→ 合并到 ${OUT}`,
+  );
+  await runShards({
+    script: fileURLToPath(import.meta.url),
+    jobs: JOBS,
+    argsFor: () => [
+      ...passthrough,
+      `--games=${GAMES}`,
+      `--seed=${formatSeed(SEED)}`,
+      `--out=${OUT}`,
+    ],
+    onTick: ({ finished, jobs, elapsed: seconds }) => {
+      console.log(`  … 已完成 ${finished}/${jobs} 片（${seconds}s）`);
+    },
+  });
+  mergeShards(JOBS, NN_FEATURE_DIM);
+  process.exit(0);
+}
+
+for (let game = firstGame; game < lastGame; game += 1) {
+  let state = createGame(cfg, offsetSeed(SEED, game));
 
   while (true) {
     const before = state.scores.slice();
@@ -157,6 +279,7 @@ for (let game = 0; game < GAMES; game += 1) {
           features: entry.features,
           target: delta[entry.seat],
           group: groupCounter,
+          discard: entry.discard,
         });
       }
     }
@@ -165,7 +288,7 @@ for (let game = 0; game < GAMES; game += 1) {
     state = reduce(over, { type: 'next-round' });
   }
 
-  if ((game + 1) % 50 === 0) {
+  if ((game - firstGame + 1) % 50 === 0) {
     const elapsed = ((Date.now() - started) / 1000).toFixed(0);
     console.log(
       `  ${game + 1}/${GAMES} 局 · ${labelled.length} 样本 · ${elapsed}s`,
@@ -195,9 +318,95 @@ for (const sample of labelled) {
   offset += 4;
 }
 
-mkdirSync(dirname(OUT), { recursive: true });
-writeFileSync(OUT, new Uint8Array(buffer));
+const outPath = SHARD === undefined ? OUT : shardPath(shardIndex);
+mkdirSync(dirname(outPath), { recursive: true });
+writeFileSync(outPath, new Uint8Array(buffer));
 
+// 侧车：每条样本「选了什么动作」，给策略头（每个候选打牌一个价值）用。
+// 1 字节/条：bit0..5 = 牌种（0..33），bit7 = 1 表示这一步是打牌。
+const actionBytes = new Uint8Array(labelled.length);
+for (let index = 0; index < labelled.length; index += 1) {
+  const tile = labelled[index].discard;
+  actionBytes[index] = tile >= 0 ? (1 << 7) | tile : 0;
+}
+writeFileSync(outPath.replace(/\.bin$/, '.act.bin'), actionBytes);
+
+/** 把一个分片的 bin 读成 { groups: Uint32Array, body: Float32Array } */
+function readShard(path: string): {
+  count: number;
+  dim: number;
+  groups: Uint32Array;
+  body: Float32Array;
+  actions: Uint8Array;
+} {
+  const raw = readFileSync(path);
+  const count = raw.readUInt32LE(0);
+  const dim = raw.readUInt32LE(4);
+  const groups = new Uint32Array(count);
+  for (let index = 0; index < count; index += 1) {
+    groups[index] = raw.readUInt32LE(8 + index * 4);
+  }
+  const bodyStart = 8 + count * 4;
+  const body = new Float32Array(count * (dim + 1));
+  for (let index = 0; index < body.length; index += 1) {
+    body[index] = raw.readFloatLE(bodyStart + index * 4);
+  }
+  const actPath = path.replace(/\.bin$/, '.act.bin');
+  const actions = existsSync(actPath)
+    ? new Uint8Array(readFileSync(actPath))
+    : new Uint8Array(count);
+  return { count, dim, groups, body, actions };
+}
+
+/** 把 N 个分片按顺序拼成一个文件（group id 已经带过偏移，直接拼即可） */
+function mergeShards(count: number, dim: number): void {
+  const parts = [];
+  let total = 0;
+  for (let index = 0; index < count; index += 1) {
+    const part = readShard(shardPath(index));
+    if (part.dim !== dim) {
+      throw new Error(`分片 ${index} 的维度是 ${part.dim}，期望 ${dim}`);
+    }
+    parts.push(part);
+    total += part.count;
+  }
+
+  const head = Buffer.alloc(8 + total * 4);
+  head.writeUInt32LE(total, 0);
+  head.writeUInt32LE(dim, 4);
+  const body = Buffer.alloc(total * (dim + 1) * 4);
+  const actions = Buffer.alloc(total);
+  let groupOffset = 8;
+  let bodyOffset = 0;
+  let actionOffset = 0;
+  for (const part of parts) {
+    for (let index = 0; index < part.count; index += 1) {
+      head.writeUInt32LE(part.groups[index], groupOffset);
+      groupOffset += 4;
+    }
+    Buffer.from(
+      part.body.buffer,
+      part.body.byteOffset,
+      part.body.byteLength,
+    ).copy(body, bodyOffset);
+    bodyOffset += part.body.byteLength;
+    actions.set(part.actions, actionOffset);
+    actionOffset += part.actions.length;
+  }
+
+  mkdirSync(dirname(OUT), { recursive: true });
+  writeFileSync(OUT, Buffer.concat([head, body]));
+  writeFileSync(OUT.replace(/\.bin$/, '.act.bin'), actions);
+  for (let index = 0; index < count; index += 1) {
+    rmSync(shardPath(index), { force: true });
+    rmSync(shardPath(index).replace(/\.bin$/, '.act.bin'), { force: true });
+  }
+  console.log(`\n合并 ${count} 个分片 → ${OUT}（${total} 样本）`);
+}
+if (SHARD !== undefined) {
+  console.log(`分片 ${SHARD} 完成：${labelled.length} 样本 → ${outPath}`);
+  process.exit(0);
+}
 const elapsed = ((Date.now() - started) / 1000).toFixed(1);
 const mean =
   labelled.reduce((sum, item) => sum + item.target, 0) /
@@ -206,3 +415,4 @@ console.log(
   `\n完成：${GAMES} 局 · ${labelled.length} 样本 · 标签均值 ${mean.toFixed(3)} · 用时 ${elapsed}s`,
 );
 console.log(`输出：${OUT}`);
+console.log(`动作侧车：${OUT.replace(/\.bin$/, '.act.bin')}`);

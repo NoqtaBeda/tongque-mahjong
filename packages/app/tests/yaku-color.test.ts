@@ -33,12 +33,12 @@ describe('番种分值色阶', () => {
     }
   });
 
-  it('12 分与 13 分共用同一档', () => {
+  it('超出档位的分值向下取整（13 分仍归到 12 分行）', () => {
+    // 十三幺现在是 8 分，引擎里已没有 13 分值；这里只锁住向下取整的行为。
     assert.equal(yakuTierOf(13), yakuTierOf(12));
     assert.equal(yakuColorOf(13), yakuColorOf(12));
-    // 十三幺是唯一的 13 分番种
     const thirteen = Object.values(YAKU).find((yaku) => yaku.points === 13);
-    assert.equal(thirteen?.name, '十三幺');
+    assert.equal(thirteen, undefined, '规则里不应再有 13 分番种');
   });
 
   it('12 分及以上才发光', () => {

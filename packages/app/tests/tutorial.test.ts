@@ -105,7 +105,7 @@ describe('教程的番种表', () => {
     ]);
   });
 
-  it('一览表按分值从小到大，且与番种表完全对得上', () => {
+  it('一览表按分值升序，且把「不能起和」的番种单独拆成一行', () => {
     const points = TUTORIAL_OVERVIEW.map((row) => row.points);
     const sorted = [...points].sort((a, b) => a - b);
     assert.deepEqual(points, sorted, '一览表必须按分值升序');
@@ -116,19 +116,33 @@ describe('教程的番种表', () => {
     );
     assert.equal(counted, TUTORIAL_ITEMS.length, '一览表应当列全所有番种');
 
-    // 每一行的名称集合必须等于番种表里该分值的所有番种
+    // 同一分值可能拆成「不能起和」「能起和」两行，按分值合并后再比对
+    const byPoints = new Map<number, string[]>();
     for (const row of TUTORIAL_OVERVIEW) {
-      const expected = TUTORIAL_ITEMS.filter(
-        (item) => item.points === row.points,
-      )
+      const names = byPoints.get(row.points) ?? [];
+      names.push(...row.items.map((item) => item.name));
+      byPoints.set(row.points, names);
+    }
+    for (const [value, names] of byPoints) {
+      const expected = TUTORIAL_ITEMS.filter((item) => item.points === value)
         .map((item) => item.name)
         .sort();
-      assert.deepEqual(
-        row.items.map((item) => item.name).sort(),
-        expected,
-        `${row.points} 分这一行对不上`,
-      );
+      assert.deepEqual(names.sort(), expected, `${value} 分这一档对不上`);
     }
+
+    // 1 分档必须拆成两行，且「不能起和」的那行排在前
+    const onePoint = TUTORIAL_OVERVIEW.filter((row) => row.points === 1);
+    assert.equal(onePoint.length, 2, '1 分档应拆成两行');
+    assert.equal(onePoint[0].gateExcluded, true, '不能起和的那行排在前面');
+    assert.equal(onePoint[1].gateExcluded, undefined);
+    assert.ok(
+      onePoint[0].items.every((item) => !countsForGate(item)),
+      '标记为「不能起和」的行里不应出现可用于起和的番种',
+    );
+    assert.ok(
+      onePoint[1].items.every((item) => countsForGate(item)),
+      '第二行应当全是可用于起和的番种',
+    );
   });
 
   it('不计入 2 番起和的正好是「一杠 + 4 个 1 分偶然」', () => {
@@ -147,7 +161,7 @@ describe('教程的番种表', () => {
     // 其余番种都计入
     assert.equal(
       TUTORIAL_ITEMS.filter((item) => countsForGate(item)).length,
-      46,
+      45,
     );
   });
 

@@ -181,7 +181,7 @@ const RAW = [
   {
     key: 'sanbugao',
     name: '三步高',
-    points: 4,
+    points: 3,
     scope: 'combo',
     liability: 'by-meld',
     hasParam: false,
@@ -224,15 +224,6 @@ const RAW = [
     repeatable: false,
   },
   {
-    key: 'erlianke',
-    name: '二连刻',
-    points: 1,
-    scope: 'combo',
-    liability: 'by-meld',
-    hasParam: false,
-    repeatable: true,
-  },
-  {
     key: 'sanlianke',
     name: '三连刻',
     points: 6,
@@ -263,7 +254,7 @@ const RAW = [
   {
     key: 'jusishu',
     name: '聚四数',
-    points: 2,
+    points: 3,
     scope: 'whole',
     liability: 'always',
     hasParam: false,
@@ -300,7 +291,7 @@ const RAW = [
   {
     key: 'jingtong',
     name: '镜同',
-    points: 2,
+    points: 3,
     scope: 'combo',
     liability: 'by-meld',
     hasParam: false,
@@ -328,7 +319,7 @@ const RAW = [
   {
     key: 'hun-yaojiu',
     name: '混幺九',
-    points: 8,
+    points: 6,
     scope: 'whole',
     liability: 'always',
     hasParam: false,
@@ -429,7 +420,7 @@ const RAW = [
   {
     key: 'shisansan',
     name: '十三幺',
-    points: 13,
+    points: 8,
     scope: 'special',
     liability: 'always',
     hasParam: false,

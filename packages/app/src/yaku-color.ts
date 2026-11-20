@@ -4,17 +4,17 @@
  * 结算面板的番种 tag、教程里的分值数字都用这套颜色，
  * 这样一眼就能看出这手牌的分主要来自哪几个大番种。
  *
- * 12 分与 13 分共用一个档位（十三幺是唯一 13 分的番种，单独一档意义不大）；
+ * 3 分档沿用原 4 分档的黄色（规则里 3 分番种：三步高、聚四数、镜同）；
  * 12 分及以上额外加一层发光。
  */
-export const YAKU_TIERS = [1, 2, 4, 6, 8, 12, 16, 24] as const;
+export const YAKU_TIERS = [1, 2, 3, 6, 8, 12, 16, 24] as const;
 
 export type YakuTier = (typeof YAKU_TIERS)[number];
 
 export const YAKU_COLORS: Readonly<Record<YakuTier, string>> = {
   1: '#7c9a86',
   2: '#5cb98a',
-  4: '#a9cf5c',
+  3: '#a9cf5c',
   6: '#e6c34a',
   8: '#f0a24a',
   12: '#f2725f',
@@ -25,7 +25,7 @@ export const YAKU_COLORS: Readonly<Record<YakuTier, string>> = {
 export const TOP_TIER: YakuTier = YAKU_TIERS[YAKU_TIERS.length - 1];
 
 /**
- * 向下取档：取「不大于该分值的最近一档」，所以 13 分会落在 12 分档。
+ * 向下取档：取「不大于该分值的最近一档」，所以 13 分会落到 12 分档。
  * 低于 1 分的一律算最低档。
  */
 export function yakuTierOf(points: number): YakuTier {

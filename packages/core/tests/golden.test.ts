@@ -56,7 +56,7 @@ describe('规则文档案例', () => {
       melds: [parseMeld('1111m', 'minkan')],
       winTile: '5m',
     });
-    assert.equal(r.best.score, 9, '清一色6 + 二连刻1 + 聚五数1 + 一杠1');
+    assert.equal(r.best.score, 9, '清一色6 + 聚五数1 + 一杠1 + 一般高1');
     assert.equal(r.best.liability, 7);
     assert.equal(r.best.penalty, 5);
   });
@@ -78,16 +78,11 @@ describe('规则文档案例', () => {
 });
 
 describe('番种表内的用例', () => {
-  it('二同刻可复计，并与碰碰和、二连刻叠加', () => {
-    // 注意：111p 与 222p 是同花色的连号刻子，二连刻也成立，因此总分是 5 而不是 4。
+  it('二同刻可复计，并与碰碰和叠加', () => {
+    // 二连刻已从规则里删除，因此总分是 2 + 1 + 1 = 4。
     const r = evaluate('111m 111p 222p 222s 44z', { winTile: '4z' });
-    assert.equal(r.best.score, 5, '碰碰和2 + 二同刻1 + 二同刻1 + 二连刻1');
-    assert.deepEqual(hitKeys(r), [
-      'erlianke',
-      'ertongke',
-      'ertongke',
-      'pengpenghe',
-    ]);
+    assert.equal(r.best.score, 4, '碰碰和2 + 二同刻1 + 二同刻1');
+    assert.deepEqual(hitKeys(r), ['ertongke', 'ertongke', 'pengpenghe']);
   });
 
   it('小三色同刻蕴含同数字的二同刻', () => {
@@ -102,32 +97,28 @@ describe('番种表内的用例', () => {
     );
   });
 
-  it('三步高与三连环可叠加，且正好撞上 12 分封顶', () => {
+  it('三步高与三连环可叠加', () => {
     const r = evaluate('123m 234m 345m 567m 99m', { winTile: '9m' });
-    assert.equal(r.best.score, 12, '清一色6 + 三步高4 + 三连环2');
-    assert.equal(r.best.rawSum, 12);
+    assert.equal(r.best.score, 11, '清一色6 + 三步高3 + 三连环2');
+    assert.equal(r.best.rawSum, 11);
   });
 
   it('缺一门要求不含字牌', () => {
     const r = evaluate('111m 222m 333s 444s 55z', { winTile: '5z' });
-    assert.equal(
-      r.best.score,
-      4,
-      '碰碰和2 + 二连刻1 + 二连刻1（缺一门不成立）',
-    );
+    assert.equal(r.best.score, 2, '碰碰和2（缺一门不成立，二连刻已删除）');
     assert.ok(!hitKeys(r).includes('queyimen'));
   });
 
   it('镜同：雀头为字牌时不成立缺一门', () => {
     const r = evaluate('123s 555s 123p 555p 44z', { winTile: '4z' });
-    assert.equal(r.best.score, 3, '镜同2 + 二同刻1');
+    assert.equal(r.best.score, 4, '镜同3 + 二同刻1');
     assert.ok(!hitKeys(r).includes('queyimen'));
     assert.ok(!hitKeys(r).includes('juwushu'), '含字牌不成聚数');
   });
 
   it('镜同：雀头为数牌时缺一门与聚五数同时成立', () => {
     const r = evaluate('123s 555s 123p 555p 44p', { winTile: '4p' });
-    assert.equal(r.best.score, 5, '镜同2 + 二同刻1 + 聚五数1 + 缺一门1');
+    assert.equal(r.best.score, 6, '镜同3 + 二同刻1 + 聚五数1 + 缺一门1');
   });
 });
 
@@ -152,8 +143,8 @@ describe('特殊和牌型', () => {
 
   it('十三幺计入关联铳责', () => {
     const r = evaluate('11m 9m 1p 9p 1s 9s 1234567z', { winTile: '1m' });
-    assert.equal(r.best.score, 13);
-    assert.equal(r.best.liability, 13);
-    assert.equal(r.best.penalty, 11);
+    assert.equal(r.best.score, 8);
+    assert.equal(r.best.liability, 8);
+    assert.equal(r.best.penalty, 6);
   });
 });

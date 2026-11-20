@@ -32,6 +32,12 @@ export {
 export type { Potential, Prospect, YakuBias } from './potential.ts';
 
 export { improvingTiles, terminalKinds, winningTiles } from './ukeire.ts';
+export {
+  decodePolicyWeights,
+  policyLogits,
+  zeroPolicyWeights,
+} from './nn/policy.ts';
+export type { PolicyWeights, RawPolicyWeights } from './nn/policy.ts';
 export type { Ukeire } from './ukeire.ts';
 
 export { DEFAULT_WEIGHTS, chooseDiscard, rankDiscards } from './discard.ts';

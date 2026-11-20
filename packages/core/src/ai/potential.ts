@@ -216,7 +216,6 @@ export function yakuProspects(features: HandFeatures): Prospect[] {
     return best;
   };
 
-  add('erlianke', tripletChain(2));
   add('sanlianke', tripletChain(3));
   add('silianke', tripletChain(4));
 

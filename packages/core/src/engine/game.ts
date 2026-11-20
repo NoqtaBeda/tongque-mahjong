@@ -4,6 +4,8 @@ import { activeKinds, seatWindOf } from '../config.ts';
 import type { RuleConfig } from '../config.ts';
 import { evaluateWin } from '../evaluate.ts';
 import { handGroups } from './groups.ts';
+import { drawRng, toRng } from './rng.ts';
+import type { RngState } from './rng.ts';
 import type { WinFlags } from '../detect.ts';
 import type {
   Action,
@@ -19,33 +21,33 @@ import type {
 
 // ---------------------------------------------------------------- 随机与洗牌
 
-function nextRandom(state: number): { state: number; value: number } {
-  const next = (state + 0x6d2b79f5) | 0;
-  let t = Math.imul(next ^ (next >>> 15), 1 | next);
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  return { state: next, value: ((t ^ (t >>> 14)) >>> 0) / 4294967296 };
+export interface SegmentCursor {
+  readonly start: number;
+  front: number;
+  back: number;
 }
 
 function buildWall(
   cfg: RuleConfig,
-  seed: number,
-): { wall: number[]; rngState: number } {
+  seed: number | bigint | string | RngState,
+): { wall: number[]; rng: RngState } {
   const active = activeKinds(cfg);
   const wall: number[] = [];
   for (let kind = 0; kind < KIND_COUNT; kind += 1) {
     if (active[kind] === 0) continue;
     for (let copy = 0; copy < 4; copy += 1) wall.push(kind);
   }
-  let rngState = seed | 0;
+  // 种子放宽到 32 位数字 / 64 位 bigint / 字符串 / 128 位熵源状态
+  let rng = toRng(seed);
   for (let index = wall.length - 1; index > 0; index -= 1) {
-    const step = nextRandom(rngState);
-    rngState = step.state;
+    const step = drawRng(rng);
+    rng = step.rng;
     const swap = Math.floor(step.value * (index + 1));
     const tmp = wall[index];
     wall[index] = wall[swap];
     wall[swap] = tmp;
   }
-  return { wall, rngState };
+  return { wall, rng };
 }
 
 // ---------------------------------------------------------------- 开局
@@ -54,25 +56,46 @@ export function startRound(
   cfg: RuleConfig,
   scores: readonly number[],
   round: number,
-  seed: number,
+  seed: number | bigint | string | RngState,
 ): GameState {
-  const { wall, rngState } = buildWall(cfg, seed);
+  const { wall, rng } = buildWall(cfg, seed);
   const players = cfg.players;
   const hands: Hand[] = [];
   for (let seat = 0; seat < players; seat += 1) hands.push(emptyHand());
 
-  let drawIndex = 0;
-  for (let pass = 0; pass < 13; pass += 1) {
-    for (let seat = 0; seat < players; seat += 1) {
-      hands[seat][wall[drawIndex]] += 1;
-      drawIndex += 1;
-    }
-  }
-
   const dealer = round % players;
-  const dealerExtra = wall[drawIndex];
-  drawIndex += 1;
-  hands[dealer][dealerExtra] += 1;
+  let drawIndex = 0;
+  const segments: SegmentCursor[] | undefined =
+    cfg.duplicateWalls === true
+      ? Array.from({ length: players }, (_, seat) => {
+          const length = Math.floor(wall.length / players);
+          const start = seat * length;
+          return { start, front: start, back: start + length - 1 };
+        })
+      : undefined;
+
+  if (segments !== undefined) {
+    // 复式：每人只从自己牌山头部取牌，庄家多取一张
+    for (let pass = 0; pass < 13; pass += 1) {
+      for (let seat = 0; seat < players; seat += 1) {
+        const seg = segments[seat];
+        hands[seat][wall[seg.front]] += 1;
+        seg.front += 1;
+      }
+    }
+    const dealerSeg = segments[dealer];
+    hands[dealer][wall[dealerSeg.front]] += 1;
+    dealerSeg.front += 1;
+  } else {
+    for (let pass = 0; pass < 13; pass += 1) {
+      for (let seat = 0; seat < players; seat += 1) {
+        hands[seat][wall[drawIndex]] += 1;
+        drawIndex += 1;
+      }
+    }
+    hands[dealer][wall[drawIndex]] += 1;
+    drawIndex += 1;
+  }
 
   const liveEnd = Math.max(
     drawIndex,
@@ -81,7 +104,7 @@ export function startRound(
 
   return {
     cfg,
-    rngState,
+    rng,
     round,
     dealer,
     phase: 'discard',
@@ -94,6 +117,7 @@ export function startRound(
     wall,
     drawIndex,
     liveEnd,
+    segments,
     deadCursor: liveEnd,
     kanCounts: new Array<number>(players).fill(0),
     drawCounts: new Array<number>(players).fill(0),
@@ -101,7 +125,10 @@ export function startRound(
     lastDiscard: null,
     claim: null,
     result: null,
-    drawnTile: dealerExtra,
+    drawnTile:
+      segments === undefined
+        ? wall[drawIndex - 1]
+        : wall[segments[dealer].front - 1],
     rinshan: false,
     finished: false,
     bestWin: null,
@@ -109,7 +136,10 @@ export function startRound(
   };
 }
 
-export function createGame(cfg: RuleConfig, seed = 1): GameState {
+export function createGame(
+  cfg: RuleConfig,
+  seed: number | bigint | string | RngState = 1,
+): GameState {
   return startRound(cfg, new Array<number>(cfg.players).fill(0), 0, seed);
 }
 
@@ -119,8 +149,21 @@ export function windOf(state: GameState, seat: Seat): number {
   return seatWindOf(state.cfg, state.round, seat);
 }
 
+/** 某座位自己牌山的剩余张数（复式）；普通模式回落到全局牌山 */
+function remainingFor(state: GameState, seat: Seat): number {
+  const seg = state.segments?.[seat];
+  if (seg === undefined) return Math.max(0, state.liveEnd - state.drawIndex);
+  return Math.max(0, seg.back - seg.front + 1);
+}
+
 export function wallRemaining(state: GameState): number {
-  return Math.max(0, state.liveEnd - state.drawIndex);
+  if (state.segments === undefined) {
+    return Math.max(0, state.liveEnd - state.drawIndex);
+  }
+  // 复式：任一家牌山见底就会流局，所以报最少的那一家
+  return Math.min(
+    ...state.segments.map((_, seat) => remainingFor(state, seat)),
+  );
 }
 
 function clone(state: GameState): GameState {
@@ -131,6 +174,7 @@ function clone(state: GameState): GameState {
     discards: state.discards.map((river) => river.slice()),
     tsumogiri: state.tsumogiri.map((river) => river.slice()),
     scores: state.scores.slice(),
+    segments: state.segments?.map((seg) => ({ ...seg })),
     kanCounts: state.kanCounts.slice(),
     drawCounts: state.drawCounts.slice(),
     claim:
@@ -150,7 +194,9 @@ function hasAnyMeld(state: GameState): boolean {
 
 function winFlags(state: GameState, seat: Seat, isTsumo: boolean): WinFlags {
   const flags: WinFlags = {};
-  const remaining = state.liveEnd - state.drawIndex;
+  const remaining = isTsumo
+    ? remainingFor(state, seat)
+    : remainingFor(state, state.lastDiscard?.from ?? seat);
   if (isTsumo) {
     if (state.rinshan) flags.rinshan = true;
     if (remaining === 0) flags.haitei = true;
@@ -180,7 +226,9 @@ function canRon(
   hand[tile] += 1;
   const flags: WinFlags = {};
   if (chankan) flags.chankan = true;
-  if (state.liveEnd - state.drawIndex === 0) flags.houtei = true;
+  if (remainingFor(state, state.lastDiscard?.from ?? seat) === 0) {
+    flags.houtei = true;
+  }
   const result = evaluateWin({
     concealed: hand,
     melds: state.melds[seat],
@@ -395,6 +443,24 @@ function finishRound(state: GameState, result: RoundResult): void {
 }
 
 function drawFor(state: GameState, seat: Seat): void {
+  const seg = state.segments?.[seat];
+  if (seg !== undefined) {
+    if (seg.front > seg.back) {
+      finishRound(state, { kind: 'draw', entries: [], discarder: null });
+      return;
+    }
+    const tile = state.wall[seg.front];
+    seg.front += 1;
+    state.hands[seat][tile] += 1;
+    state.drawnTile = tile;
+    state.rinshan = false;
+    state.drawCounts[seat] += 1;
+    state.phase = 'discard';
+    state.actor = seat;
+    state.claim = null;
+    state.lastDiscard = null;
+    return;
+  }
   if (state.drawIndex >= state.liveEnd) {
     finishRound(state, { kind: 'draw', entries: [], discarder: null });
     return;
@@ -412,6 +478,23 @@ function drawFor(state: GameState, seat: Seat): void {
 }
 
 function drawReplacement(state: GameState, seat: Seat): void {
+  const seg = state.segments?.[seat];
+  if (seg !== undefined) {
+    if (seg.front > seg.back) {
+      finishRound(state, { kind: 'draw', entries: [], discarder: null });
+      return;
+    }
+    const tile = state.wall[seg.back];
+    seg.back -= 1;
+    state.hands[seat][tile] += 1;
+    state.drawnTile = tile;
+    state.rinshan = true;
+    state.phase = 'discard';
+    state.actor = seat;
+    state.claim = null;
+    state.lastDiscard = null;
+    return;
+  }
   let tile: number | null = null;
   if (state.deadCursor < state.wall.length) {
     tile = state.wall[state.deadCursor];
@@ -442,7 +525,7 @@ export function reduce(state: GameState, action: Action): GameState {
         next.cfg,
         next.scores,
         next.round + 1,
-        next.rngState,
+        next.rng,
       );
       // 整场最高和牌与对局记录都要跨局保留
       following.bestWin = next.bestWin;
@@ -716,7 +799,7 @@ function settleRon(
     hand[tile] += 1;
     const flags: WinFlags = {};
     if (robKan) flags.chankan = true;
-    if (state.liveEnd - state.drawIndex === 0) flags.houtei = true;
+    if (remainingFor(state, from) === 0) flags.houtei = true;
 
     const result = evaluateWin({
       concealed: hand,
