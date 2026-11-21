@@ -872,15 +872,13 @@ const ROUTE_DEFS: readonly {
   {
     id: 'A',
     title: '一色全体',
-    summary:
-      '只留一种花色的数牌。',
+    summary: '只留一种花色的数牌。',
     keys: ['hunyise', 'qingyise'],
   },
   {
     id: 'B',
     title: '一色组合',
-    summary:
-      '同花色里做三组以上数字递增的顺子。',
+    summary: '同花色里做三组以上数字递增的顺子。',
     keys: ['qinglong', 'sanlianhuan', 'sanbugao'],
   },
   {

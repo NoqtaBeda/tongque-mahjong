@@ -53,7 +53,7 @@ def main():
     device = pick_device()
 
     files = [path.strip() for path in args.data.split(",") if path.strip()]
-    features, targets, groups, dim = load_many(files)
+    features, targets, groups, sample_weights, dim = load_many(files)
     train_idx, val_idx, test_idx = split_by_group3(
         groups, args.valid_ratio, args.test_ratio, args.seed
     )
@@ -65,6 +65,7 @@ def main():
 
     x = torch.from_numpy(features).to(device)
     y = torch.from_numpy(targets).to(device)
+    w = torch.from_numpy(sample_weights.astype(np.float32)).to(device)
     tr = torch.from_numpy(train_idx).to(device)
     va = torch.from_numpy(val_idx).to(device)
     te = torch.from_numpy(test_idx).to(device)
@@ -85,6 +86,11 @@ def main():
     optimizer = torch.optim.Adam(
         model.parameters(), lr=args.lr, weight_decay=args.weight_decay
     )
+    def weighted_mse(pred, target, weight):
+        """加权 MSE：v2 数据的权重列（目前全为 1，留给后续按距离减权用）。"""
+        return ((pred - target) ** 2 * weight).sum() / weight.sum()
+
+    # 指标仍然用未加权 MSE，保证与 v1 数据的相关系数可比
     loss_fn = nn.MSELoss()
 
     best_r, best_epoch, best_state = -1.0, 0, None
@@ -96,7 +102,7 @@ def main():
         for start in range(0, perm.numel(), args.batch):
             idx = perm[start : start + args.batch]
             optimizer.zero_grad()
-            loss = loss_fn(model(x[idx]), y[idx])
+            loss = weighted_mse(model(x[idx]), y[idx], w[idx])
             loss.backward()
             optimizer.step()
 

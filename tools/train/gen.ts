@@ -64,6 +64,71 @@ const SEED = parseSeed(args.get('seed'));
  * 但能把文件从几个 GB 压到几十 MB。
  */
 const PER_ROUND = Number(args.get('per-round') ?? 6);
+/** 采样方式：stride = 整场决策序列等距取；per-seat = 按座位分层，每家各取 PER_ROUND/n 条 */
+const SAMPLE = args.get('sample') ?? 'stride';
+/**
+ * 逐决策折扣标签：第 i 个决策的标签 = gamma^(该座位之后还有几个决策) × 本场分数变化。
+ * 离终局越近权重越大，早巡的"正确打法"不会被终局结果污染。
+ */
+const GAMMA = Number(args.get('gamma') ?? 0.6);
+/** 折扣地平线：离终局超过 K 个决策的样本直接丢弃（只对分数有变化的座位生效） */
+const HORIZON = Number(args.get('horizon') ?? 6);
+/**
+ * 零标签样本（第三家/流局）每家最多保留几条。
+ * 它们是"这条路不值分"的锚点，但每本场 4 家 × 3 条会把非零信号淹没，默认限 1 条。
+ */
+const ANCHORS = Number(args.get('anchors') ?? 1);
+/**
+ * 有分数变化的座位怎么取：tail = 只取最后 K 个（责任最明确，但状态覆盖偏终局）；
+ * even = 等距（覆盖与实战一致）。默认 even——迭代 1 复盘发现 tail 会让网络只学到终局局面。
+ */
+const TAIL = args.get('tail') === '1';
+/** 路线化探索：每本场轮流指定一条主线，并在该本场给这条线的番种加权 */
+const ROUTE_BALANCE = args.get('route-balance') === '1';
+/**
+ * 生成侧的主线表，和教程/等频采样的分类保持一致
+ * （8 条主线；杠与偶然类不参与路线化探索）
+ */
+const ROUTE_KEYS: readonly (readonly string[])[] = [
+  ['hunyise', 'qingyise', 'jiulian'],
+  [
+    'qinglong',
+    'sanlianhuan',
+    'sanbugao',
+    'yise-santongshun',
+    'silianhuan',
+    'sibugao',
+    'yise-sitongshun',
+  ],
+  ['sanse-tongshun', 'xiao-san-se-tongke', 'sanse-tongke'],
+  [
+    'hun-quan-dai-yaojiu',
+    'chun-quan-dai-yaojiu',
+    'hun-yaojiu',
+    'qing-yaojiu',
+    'shisansan',
+  ],
+  ['jusishu', 'jusanshu', 'juliangshu'],
+  ['jingtong', 'liangbangao'],
+  ['pengpenghe', 'qiduizi', 'sanlianke', 'silianke', 'ziyise'],
+  [
+    'queyimen',
+    'juwushu',
+    'yibangao',
+    'ertongke',
+    'menfengke',
+    'sanyuanke',
+    'xiao-sanyuan',
+    'da-sanyuan',
+    'xiao-san-feng-ke',
+    'san-feng-ke',
+    'xiao-sixi',
+    'da-sixi',
+  ],
+];
+/** 文件格式版本：2 = magic + 权重列 */
+const FORMAT_VERSION = 2;
+const FORMAT_MAGIC = 0x54513032; // "TQ02"
 /**
  * 打牌决策记录「打完之后」的 13 张手牌（默认），而不是「打牌前」的 14 张。
  *
@@ -124,11 +189,30 @@ const labelled: {
   target: number;
   group: number;
   discard: number;
+  weight: number;
 }[] = [];
 const started = Date.now();
 let groupCounter = 0;
+/** 路线化探索用：每本场轮换一条主线 */
+let routeIndex = 0;
+/** 自对弈基准档（构建一次即可，别在决策循环里重复取） */
+const baseProfile = profileOf(LEVEL);
 
-function playRound(state: GameState, pending: Pending[]): GameState {
+/** 路线化探索：给指定主线的番种加权，逼 AI 真去造这条线 */
+function routeProfile(routeIndex: number) {
+  if (!ROUTE_BALANCE) return null;
+  const base = profileOf(LEVEL);
+  const keys = ROUTE_KEYS[routeIndex % ROUTE_KEYS.length];
+  const bias: Record<string, number> = {};
+  for (const key of keys) bias[key] = 1.8;
+  return { ...base, yakuBias: bias, biasGate: undefined };
+}
+
+function playRound(
+  state: GameState,
+  pending: Pending[],
+  roundProfile: ReturnType<typeof profileOf> | null,
+): GameState {
   let current = state;
   let guard = 0;
   while (true) {
@@ -161,7 +245,9 @@ function playRound(state: GameState, pending: Pending[]): GameState {
       extractFeatures(observation.hand, melds, observation.seatWind),
     );
 
-    let action = decide(observation, { profile: profileOf(LEVEL) });
+    let action = decide(observation, {
+      profile: roundProfile ?? baseProfile,
+    });
     if (EPS > 0 && exploreRandom() < EPS) {
       const discards = legal.filter((item) => item.type === 'discard');
       if (discards.length > 0) {
@@ -258,28 +344,80 @@ for (let game = firstGame; game < lastGame; game += 1) {
   while (true) {
     const before = state.scores.slice();
     const pending: Pending[] = [];
-    const over = playRound(state, pending);
+    routeIndex += 1;
+    const roundProfile = routeProfile(routeIndex);
+    const over = playRound(state, pending, roundProfile);
 
     if (pending.length > 0) {
       const delta = over.scores.map((score, seat) => score - before[seat]);
       groupCounter += 1;
-      // 同一本场内的样本高度相关（共享同一个标签），训练时必须按 group 切分，
-      // 否则验证集会被同场的样本"泄漏"，相关系数虚高。
-      // 同时也按本场抽样，避免文件随局数线性膨胀。
-      const keep: Pending[] = [];
-      if (pending.length <= PER_ROUND) {
-        keep.push(...pending);
+
+      // 该座位在这个决策之后还有几个自己的决策（0 = 最后一个决策）
+      const distance = new Array<number>(pending.length).fill(0);
+      const after = [0, 0, 0, 0];
+      for (let index = pending.length - 1; index >= 0; index -= 1) {
+        const seat = pending[index].seat;
+        distance[index] = after[seat];
+        after[seat] += 1;
+      }
+
+      // 选样本：stride = 整场等距；per-seat = 每家各取若干
+      const keep: number[] = [];
+      if (SAMPLE === 'per-seat') {
+        const players = cfg.players;
+        const perSeat = Math.max(1, Math.floor(PER_ROUND / players));
+        for (let seat = 0; seat < players; seat += 1) {
+          const own: number[] = [];
+          for (let index = 0; index < pending.length; index += 1) {
+            if (pending[index].seat === seat) own.push(index);
+          }
+          // 分数没变化的座位只留少量锚点，别用 0 标签淹没信号
+          const quota = delta[seat] === 0 ? ANCHORS : perSeat;
+          if (own.length <= quota) keep.push(...own);
+          else if (delta[seat] === 0) {
+            for (let index = 0; index < quota; index += 1) {
+              keep.push(own[Math.floor((index * own.length) / quota)]);
+            }
+          } else if (TAIL) {
+            // tail 模式：只取最后 K 个（责任最明确，但状态覆盖偏终局）
+            const limit = Math.min(quota, HORIZON + 1);
+            for (
+              let index = own.length - limit;
+              index < own.length;
+              index += 1
+            ) {
+              keep.push(own[index]);
+            }
+          } else {
+            // 默认：等距，保证训练分布和实战一致（tail 会丢掉中前盘状态）
+            for (let index = 0; index < quota; index += 1) {
+              keep.push(own[Math.floor((index * own.length) / quota)]);
+            }
+          }
+        }
+      } else if (pending.length <= PER_ROUND) {
+        for (let index = 0; index < pending.length; index += 1)
+          keep.push(index);
       } else {
         for (let index = 0; index < PER_ROUND; index += 1) {
-          keep.push(pending[Math.floor((index * pending.length) / PER_ROUND)]);
+          keep.push(Math.floor((index * pending.length) / PER_ROUND));
         }
       }
-      for (const entry of keep) {
+
+      for (const index of keep) {
+        const entry = pending[index];
+        const change = delta[entry.seat];
+        // 标签保持「本场净得分」的原量纲（V 的尺度不变，不用重扫 pw）；
+        // 离终局越远，责任越不确定 → 用权重 gamma^d 衰减，超过地平线直接丢弃。
+        const label = change;
+        const weight = change === 0 ? 1 : Math.pow(GAMMA, distance[index]);
+        if (change !== 0 && distance[index] > HORIZON) continue;
         labelled.push({
           features: entry.features,
-          target: delta[entry.seat],
+          target: label,
           group: groupCounter,
           discard: entry.discard,
+          weight,
         });
       }
     }
@@ -296,17 +434,27 @@ for (let game = firstGame; game < lastGame; game += 1) {
   }
 }
 
-// 写二进制：uint32 count, uint32 dim, uint32 groups[count], 然后 count × (dim 个 float32 + 1 个 float32 目标)
+// v2 二进制：magic / count / dim / flags / groups / weights / body(dim+1)
 const dim = NN_FEATURE_DIM;
+const headerBytes = 16;
 const buffer = new ArrayBuffer(
-  8 + labelled.length * 4 + labelled.length * (dim + 1) * 4,
+  headerBytes +
+    labelled.length * 4 +
+    labelled.length * 4 +
+    labelled.length * (dim + 1) * 4,
 );
 const view = new DataView(buffer);
-view.setUint32(0, labelled.length, true);
-view.setUint32(4, dim, true);
-let offset = 8;
+view.setUint32(0, FORMAT_MAGIC, true);
+view.setUint32(4, labelled.length, true);
+view.setUint32(8, dim, true);
+view.setUint32(12, 1, true); // flags: bit0 = 带权重列
+let offset = headerBytes;
 for (const sample of labelled) {
   view.setUint32(offset, sample.group, true);
+  offset += 4;
+}
+for (const sample of labelled) {
+  view.setFloat32(offset, sample.weight, true);
   offset += 4;
 }
 for (const sample of labelled) {
@@ -336,17 +484,30 @@ function readShard(path: string): {
   count: number;
   dim: number;
   groups: Uint32Array;
+  weights: Float32Array;
   body: Float32Array;
   actions: Uint8Array;
 } {
   const raw = readFileSync(path);
-  const count = raw.readUInt32LE(0);
-  const dim = raw.readUInt32LE(4);
+  const magic = raw.readUInt32LE(0);
+  const v2 = magic === FORMAT_MAGIC;
+  const countOffset = v2 ? 4 : 0;
+  const dimOffset = v2 ? 8 : 4;
+  const count = raw.readUInt32LE(countOffset);
+  const dim = raw.readUInt32LE(dimOffset);
+  const groupsStart = v2 ? 16 : 8;
   const groups = new Uint32Array(count);
   for (let index = 0; index < count; index += 1) {
-    groups[index] = raw.readUInt32LE(8 + index * 4);
+    groups[index] = raw.readUInt32LE(groupsStart + index * 4);
   }
-  const bodyStart = 8 + count * 4;
+  const weights = new Float32Array(count).fill(1);
+  if (v2) {
+    const weightsStart = groupsStart + count * 4;
+    for (let index = 0; index < count; index += 1) {
+      weights[index] = raw.readFloatLE(weightsStart + index * 4);
+    }
+  }
+  const bodyStart = groupsStart + count * 4 + (v2 ? count * 4 : 0);
   const body = new Float32Array(count * (dim + 1));
   for (let index = 0; index < body.length; index += 1) {
     body[index] = raw.readFloatLE(bodyStart + index * 4);
@@ -355,7 +516,7 @@ function readShard(path: string): {
   const actions = existsSync(actPath)
     ? new Uint8Array(readFileSync(actPath))
     : new Uint8Array(count);
-  return { count, dim, groups, body, actions };
+  return { count, dim, groups, weights, body, actions };
 }
 
 /** 把 N 个分片按顺序拼成一个文件（group id 已经带过偏移，直接拼即可） */
@@ -371,18 +532,24 @@ function mergeShards(count: number, dim: number): void {
     total += part.count;
   }
 
-  const head = Buffer.alloc(8 + total * 4);
-  head.writeUInt32LE(total, 0);
-  head.writeUInt32LE(dim, 4);
+  const head = Buffer.alloc(16 + total * 4);
+  head.writeUInt32LE(FORMAT_MAGIC, 0);
+  head.writeUInt32LE(total, 4);
+  head.writeUInt32LE(dim, 8);
+  head.writeUInt32LE(1, 12); // flags: 带权重
+  const weights = Buffer.alloc(total * 4);
   const body = Buffer.alloc(total * (dim + 1) * 4);
   const actions = Buffer.alloc(total);
-  let groupOffset = 8;
+  let groupOffset = 16;
+  let weightOffset = 0;
   let bodyOffset = 0;
   let actionOffset = 0;
   for (const part of parts) {
     for (let index = 0; index < part.count; index += 1) {
       head.writeUInt32LE(part.groups[index], groupOffset);
       groupOffset += 4;
+      weights.writeFloatLE(part.weights[index], weightOffset);
+      weightOffset += 4;
     }
     Buffer.from(
       part.body.buffer,
@@ -395,7 +562,7 @@ function mergeShards(count: number, dim: number): void {
   }
 
   mkdirSync(dirname(OUT), { recursive: true });
-  writeFileSync(OUT, Buffer.concat([head, body]));
+  writeFileSync(OUT, Buffer.concat([head, weights, body]));
   writeFileSync(OUT.replace(/\.bin$/, '.act.bin'), actions);
   for (let index = 0; index < count; index += 1) {
     rmSync(shardPath(index), { force: true });
@@ -411,8 +578,16 @@ const elapsed = ((Date.now() - started) / 1000).toFixed(1);
 const mean =
   labelled.reduce((sum, item) => sum + item.target, 0) /
   Math.max(1, labelled.length);
+const zeroShare =
+  labelled.filter((item) => item.target === 0).length /
+  Math.max(1, labelled.length);
 console.log(
-  `\n完成：${GAMES} 局 · ${labelled.length} 样本 · 标签均值 ${mean.toFixed(3)} · 用时 ${elapsed}s`,
+  `\n完成：${GAMES} 局 · ${labelled.length} 样本 · 标签均值 ${mean.toFixed(3)} ` +
+    `· 零标签占比 ${(zeroShare * 100).toFixed(1)}% · 用时 ${elapsed}s`,
+);
+console.log(
+  `格式 v${FORMAT_VERSION} · gamma=${GAMMA} · horizon=${HORIZON} · sample=${SAMPLE}` +
+    ` · route-balance=${ROUTE_BALANCE ? 'on' : 'off'} · per-round=${PER_ROUND}`,
 );
 console.log(`输出：${OUT}`);
 console.log(`动作侧车：${OUT.replace(/\.bin$/, '.act.bin')}`);

@@ -200,7 +200,8 @@ body {
 
 .app {
   /* 整桌边长：宽度取 94vw，高度扣掉顶栏和内边距，尽量铺满屏幕 */
-  --b: min(94vw, calc(100vh - 100px));
+  /* 牌桌边长：宽高各占一半权重，窄屏也不再切换公式（切换会在断点处整体跳一下） */
+  --b: min(96vw, calc(100vh - 95px));
   /* 牌河里的牌 */
   --tw: calc(var(--b) / 25.6);
   --th: calc(var(--tw) * 1.3326);
@@ -214,7 +215,9 @@ body {
   --bw: calc(var(--b) / 30);
   --side: calc(var(--tw) * 2);
   /* 四家分数到中央块的距离（统一值） */
-  --ci-gap: 7px;
+  /* 中央信息区的排版单位：跟着牌桌尺寸走，窗口小的时候整块等比缩小 */
+  --ci-unit: calc(var(--b) / 42);
+  --ci-gap: calc(var(--ci-unit) * 0.28);
 
   min-height: 100vh;
   display: flex;
@@ -262,7 +265,10 @@ button {
   background: var(--panel-2);
   color: var(--ink);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.1s ease;
 }
 
 button:hover:not(:disabled) {
@@ -316,7 +322,9 @@ button.ghost {
   border-radius: 22px;
   background: linear-gradient(180deg, #1b2f26 0%, #12211b 100%);
   border: 1px solid #2f4a3a;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
 .board-three {
@@ -475,6 +483,11 @@ button.ghost {
   gap: 2px;
 }
 
+/* 牌背永远按牌面比例显示，不允许 flex 拉伸/压扁（窗口变小时挤变形就是它） */
+.hand-backs .tile.tile-back {
+  flex: 0 0 auto;
+}
+
 .hand-backs-top {
   flex: 0 0 auto;
 }
@@ -507,6 +520,7 @@ button.ghost {
 /* 上家 / 下家的牌背按 90° 摆放：宽高互换，牌的长边横过来 */
 .hand-backs-left .tile.tile-back,
 .hand-backs-right .tile.tile-back {
+  /* 侧家横放：宽 = 高 × 牌面比例，和底家手牌同一形状 */
   width: calc(var(--bw) * 1.3326);
   height: var(--bw);
 }
@@ -522,7 +536,12 @@ button.ghost {
   height: calc(2 * var(--rh) + var(--rw) + 10px);
   position: relative;
   border-radius: 14px;
-  background: radial-gradient(circle at 50% 45%, #1d4033 0%, var(--felt) 55%, #0e2a22 100%);
+  background: radial-gradient(
+    circle at 50% 45%,
+    #1d4033 0%,
+    var(--felt) 55%,
+    #0e2a22 100%
+  );
   border: 1px solid #2f5140;
   box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.5);
   overflow: hidden;
@@ -659,9 +678,9 @@ button.ghost {
 .ci-chip {
   display: inline-flex;
   align-items: center;
-  font-size: 17px;
+  font-size: clamp(10px, calc(var(--ci-unit) * 0.68), 17px);
   font-weight: 700;
-  padding: 4px 14px;
+  padding: 0.24em 0.82em;
   border-radius: 999px;
   background: var(--pc-dim, rgba(138, 165, 150, 0.2));
   color: var(--pc, var(--muted));
@@ -678,6 +697,8 @@ button.ghost {
 .ci-right .ci-marks {
   writing-mode: vertical-rl;
   text-orientation: sideways;
+  /* 竖排时"宽度"等于行高，必须固定住，否则缩小后字形会被压扁 */
+  line-height: 1.2;
 }
 
 /* 下家：整套再翻 180°，朝向从"上家"变成"下家"（盒子尺寸不变，不会错位） */
@@ -688,7 +709,8 @@ button.ghost {
 
 .ci-left .ci-chip,
 .ci-right .ci-chip {
-  padding: 12px 6px;
+  padding: 0.7em 0.35em;
+  min-width: 1.1em;
 }
 
 /* 庄 / 行动中：尺寸约为名牌的 2/3，方向跟随名牌，两者并排 */
@@ -701,9 +723,9 @@ button.ghost {
 
 .ci-marks em {
   font-style: normal;
-  font-size: 11px;
+  font-size: clamp(7px, calc(var(--ci-unit) * 0.44), 11px);
   line-height: 1.25;
-  padding: 1px 9px;
+  padding: 0.09em 0.82em;
   border-radius: 999px;
   white-space: nowrap;
 }
@@ -711,7 +733,7 @@ button.ghost {
 /* 竖排时 padding 是物理方向，必须把左右的内边距换到上下，否则小牌子会变横的 */
 .ci-left .ci-marks em,
 .ci-right .ci-marks em {
-  padding: 9px 2px;
+  padding: 0.82em 0.18em;
 }
 
 .mark-dealer {
@@ -742,9 +764,9 @@ button.ghost {
   column-gap: 6px;
   row-gap: 0;
   /* 门风贴框内侧，距离和外面的名牌差不多 */
-  padding: 8px 12px;
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  border-radius: 16px;
+  padding: calc(var(--ci-unit) * 0.3) calc(var(--ci-unit) * 0.42);
+  border: max(1px, calc(var(--ci-unit) * 0.08)) solid rgba(255, 255, 255, 0.5);
+  border-radius: calc(var(--ci-unit) * 0.62);
   background: rgba(255, 255, 255, 0.05);
 }
 
@@ -757,7 +779,7 @@ button.ghost {
 }
 
 .ci-wind-char {
-  font-size: 16px;
+  font-size: clamp(11px, calc(var(--ci-unit) * 0.84), 22px);
   font-weight: 800;
   line-height: 1;
   color: rgba(255, 255, 255, 0.5);
@@ -788,18 +810,18 @@ button.ghost {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: calc(var(--ci-unit) * 0.1);
 }
 
 .center-round {
-  font-size: 26px;
+  font-size: clamp(15px, calc(var(--ci-unit) * 1.36), 34px);
   font-weight: 800;
-  letter-spacing: 2px;
+  letter-spacing: 0.06em;
   line-height: 1.1;
 }
 
 .center-wall {
-  font-size: 17px;
+  font-size: clamp(11px, calc(var(--ci-unit) * 0.92), 22px);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.5px;
@@ -852,7 +874,9 @@ button.ghost {
 
 .tile-clickable {
   cursor: pointer;
-  transition: transform 0.12s ease, filter 0.12s ease;
+  transition:
+    transform 0.12s ease,
+    filter 0.12s ease;
 }
 
 .tile-clickable:hover {
@@ -945,8 +969,6 @@ button.ghost {
   height: calc(var(--ms) * 1.3326);
   transform: translate(-50%, -50%) rotate(90deg);
 }
-
-
 
 /* 对家的副露整组转 180°：他的左端在屏幕上就是右端。
    和 .slot-top .river 的旋转保持一致，否则横置牌的"来源方向"在对家身上是镜像反的。 */
@@ -1241,8 +1263,6 @@ button.ghost {
   font-weight: 700;
 }
 
-
-
 .settings-warn {
   margin: 14px 0 0;
   font-size: 14px;
@@ -1461,8 +1481,6 @@ button.ghost {
   margin: 0 3px;
 }
 
-
-
 .result-scores {
   margin-top: 16px;
   padding-top: 12px;
@@ -1537,9 +1555,7 @@ button.ghost {
 /* ---------- 窄屏 ---------- */
 
 @media (max-width: 820px) {
-  .app {
-    --b: min(98vw, calc(100vh - 90px));
-  }
+  /* --b 已统一，这里不再覆盖 */
 
   .topbar {
     font-size: 12px;
@@ -1551,10 +1567,7 @@ button.ghost {
     padding: 6px 14px;
   }
 
-  .hand-backs-left .tile.tile-back,
-  .hand-backs-right .tile.tile-back {
-    width: calc(var(--bw) * 0.56);
-  }
+  /* 侧家牌背不设断点：它本来就按 --b 连续缩放，跨 820px 时不该有跳变 */
 }
 
 /* ---------- 对局记录 ---------- */
@@ -1635,7 +1648,6 @@ button.ghost {
   flex-wrap: wrap;
 }
 
-
 /* 配色与放铳失分保持一致：得分绿、失分淡黄/亮红、不变白 */
 .delta-gain {
   color: var(--accent);
@@ -1710,7 +1722,6 @@ button.ghost {
 .score-arrow {
   color: var(--muted);
 }
-
 
 /* 摸切（刚摸到就打出）：整张牌去色 + 压暗，一眼能看出和手切的差别。
    力度靠这三个参数调：去色 0.25 / 压暗 0.85 / 上沿内阴影 0.35。 */
@@ -2005,7 +2016,10 @@ button.ghost {
   background: var(--panel-2);
   color: var(--ink);
   cursor: pointer;
-  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+  transition:
+    transform 0.12s ease,
+    border-color 0.12s ease,
+    background 0.12s ease;
 }
 
 .start-btn:hover {

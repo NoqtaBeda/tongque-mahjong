@@ -14,25 +14,54 @@ from torch import nn
 SCALE = 12.0
 
 
+#: v2 文件的 magic（ASCII "TQ02"）
+FORMAT_MAGIC = 0x54513032
+
+
 def load(path):
-    """读 gen.ts 的二进制：uint32 count / uint32 dim / uint32 groups[count] / count×(dim+1) float32。"""
+    """读 gen.ts 的二进制。
+
+    v2：magic / count / dim / flags / groups / weights / body(dim+1) float32
+    v1（无 magic）：count / dim / groups / body —— 兼容旧文件，权重补 1。
+    """
     raw = open(path, "rb").read()
-    count, dim = struct.unpack_from("<II", raw, 0)
-    groups = np.frombuffer(raw, dtype=np.uint32, count=count, offset=8).astype(np.int64)
+    magic = struct.unpack_from("<I", raw, 0)[0]
+    if magic == FORMAT_MAGIC:
+        count, dim, flags = struct.unpack_from("<III", raw, 4)
+        groups_start = 16
+        groups = np.frombuffer(
+            raw, dtype=np.uint32, count=count, offset=groups_start
+        ).astype(np.int64)
+        weights_start = groups_start + count * 4
+        if flags & 1:
+            weights = np.frombuffer(
+                raw, dtype=np.float32, count=count, offset=weights_start
+            ).copy()
+            body_start = weights_start + count * 4
+        else:
+            weights = np.ones(count, dtype=np.float32)
+            body_start = weights_start
+    else:
+        count, dim = struct.unpack_from("<II", raw, 0)
+        groups = np.frombuffer(raw, dtype=np.uint32, count=count, offset=8).astype(
+            np.int64
+        )
+        weights = np.ones(count, dtype=np.float32)
+        body_start = 8 + count * 4
     body = np.frombuffer(
-        raw, dtype=np.float32, count=count * (dim + 1), offset=8 + count * 4
+        raw, dtype=np.float32, count=count * (dim + 1), offset=body_start
     ).reshape(count, dim + 1)
     features = body[:, :dim].copy()
     targets = (body[:, dim] / SCALE).copy()
-    return features, targets, groups, dim
+    return features, targets, groups, weights, dim
 
 
 def load_many(paths):
     """把多个 .bin 拼起来（不同文件的 group 编号要错开）。"""
-    features, targets, groups, dim = [], [], [], 0
+    features, targets, groups, weights, dim = [], [], [], [], 0
     offset = 0
     for path in paths:
-        f, t, g, d = load(path)
+        f, t, g, w, d = load(path)
         if dim == 0:
             dim = d
         elif dim != d:
@@ -40,11 +69,13 @@ def load_many(paths):
         features.append(f)
         targets.append(t)
         groups.append(g + offset)
+        weights.append(w)
         offset += int(g.max()) + 1
     return (
         np.concatenate(features),
         np.concatenate(targets),
         np.concatenate(groups),
+        np.concatenate(weights),
         dim,
     )
 
