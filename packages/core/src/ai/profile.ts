@@ -42,7 +42,7 @@ export interface AiProfile {
  * 取 6000（平台峰值）。注意量纲：网络输出的是「本场期望得分」（±十几分），
  * 和手写潜力的「番数」（0..12）完全不同，所以数值上不可与普通档的 30 直接比较。
  */
-export const ADVANCED_WEIGHTS: DiscardWeights = {
+const ADVANCED_WEIGHTS: DiscardWeights = {
   ...DEFAULT_WEIGHTS,
   // 2026-11-20 番种表调整后重扫（4 万局配对 A/B，SE≈0.04）：
   //   6000 → 基准   9000 → +0.12（z=2.9）   12000 → +0.12（z=3.4）   16000 → +0.14（z=3.0）

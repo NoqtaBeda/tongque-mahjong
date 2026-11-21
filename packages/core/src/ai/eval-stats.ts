@@ -8,7 +8,7 @@
  * 牌运差异被抵消。因此 SE 按"对"来算（配对 SE），比把 2N 局当独立样本算出来的小约 25%
  * （实测 SE ≈ 8.0/√N：2400 局 0.16、9000 局 0.08、40000 局 0.04）。
  */
-export interface AbSummary {
+interface AbSummary {
   /** 总对局数（偶数，等于对数的两倍） */
   readonly games: number;
   /** 配对数 = games / 2 */

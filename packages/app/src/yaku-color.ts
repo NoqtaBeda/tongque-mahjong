@@ -9,7 +9,7 @@
  */
 export const YAKU_TIERS = [1, 2, 3, 6, 8, 12, 16, 24] as const;
 
-export type YakuTier = (typeof YAKU_TIERS)[number];
+type YakuTier = (typeof YAKU_TIERS)[number];
 
 export const YAKU_COLORS: Readonly<Record<YakuTier, string>> = {
   1: '#7c9a86',

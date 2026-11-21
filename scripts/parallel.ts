@@ -19,13 +19,13 @@ import { openSync, closeSync } from 'node:fs';
  * @param {number} [options.tickMs]     心跳间隔，默认 60 秒
  * @returns {Promise<{elapsed: number}>} 总耗时（秒）
  */
-export interface ShardProgress {
+interface ShardProgress {
   readonly finished: number;
   readonly jobs: number;
   readonly elapsed: string;
 }
 
-export interface RunShardsOptions {
+interface RunShardsOptions {
   /** 脚本路径（`.ts` 交给当前 Node 的类型剥离） */
   readonly script: string;
   /** 分片数 */

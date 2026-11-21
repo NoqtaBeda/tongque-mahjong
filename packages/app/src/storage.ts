@@ -1,4 +1,4 @@
-import { KIND_COUNT, isRng, toRng } from '../../core/src/index.ts';
+import { KIND_COUNT, isRng } from '../../core/src/index.ts';
 import type { GameState } from '../../core/src/index.ts';
 
 const STORAGE_KEY = 'mahjong-playground/save/v2';
@@ -67,16 +67,10 @@ export function decodeState(raw: string): GameState | null {
   if (!Array.isArray(state.scores) || state.scores.length !== players)
     return null;
   if (typeof state.phase !== 'string') return null;
-  // 对局记录是后加的字段，旧存档里没有，补成空数组即可（否则面板会读 undefined）
-  if (!Array.isArray(state.history)) state.history = [];
-  // 摸切标记同理：旧存档没有就按「全是手切」补齐，长度与牌河保持一致
-  if (!Array.isArray(state.tsumogiri))
-    state.tsumogiri = state.discards.map(() => []);
-  // 随机状态从 32 位（rngState: number）升级到 128 位（rng: [4]）：旧存档用旧种子重建
-  if (!isRng(state.rng)) {
-    const legacy = (candidate as { rngState?: unknown }).rngState;
-    state.rng = toRng(typeof legacy === 'number' ? legacy : 1);
-  }
+  // 只接受当前格式：缺字段的存档一律丢弃（存档写坏了就开新局，不做就地修补）
+  if (!Array.isArray(state.history)) return null;
+  if (!Array.isArray(state.tsumogiri)) return null;
+  if (!isRng(state.rng)) return null;
 
   return state;
 }
@@ -120,7 +114,7 @@ const VIEW_KEY = 'mahjong-playground/view/v2';
  * 对局本身已经在存档里，但「终局」页是点过按钮才切换的——不记下来的话，
  * 和牌/最终结算界面开着时关掉浏览器，下次打开就退回最后一局的开局画面了。
  */
-export interface ViewState {
+interface ViewState {
   /** 是否已经翻到最终结算页（打完所有局之后） */
   readonly finalShown: boolean;
 }

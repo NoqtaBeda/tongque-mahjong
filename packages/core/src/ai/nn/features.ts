@@ -27,7 +27,7 @@ export interface EncodeInput {
   readonly threat?: ThreatInput;
 }
 
-export interface ThreatInput {
+interface ThreatInput {
   /** 每家副露的组数（下标是座位号） */
   readonly oppMelds: readonly number[];
   /** 每家牌河的张数 */

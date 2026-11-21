@@ -1,7 +1,7 @@
 // 自对弈评测：让两个 AI 档案轮流坐各个位子，统计和了率 / 放铳率 / 净得分 / 平均顺位。
 //
 // 【约定】A = 「迭代前」，B = 「迭代后」，打印的是 `B − A`：正值 = 迭代后更强。
-//   参数用 `--before=` / `--after=`（`--anet=` / `--candnet=` 是旧别名，仅对调复核用）。
+//   参数用 `--before=` / `--after=`。
 //   配对设计：同一副牌打两遍、交换座位，牌运被抵消；末尾打印配对 SE 与结论（|z|<2 判噪声）。
 //   `--jobs=N` 分片并发；覆盖类参数（--pw/--uw/--df/--mp/--pol…）只作用于 B 侧。
 //
@@ -212,12 +212,9 @@ function netLabel(spec: string): string {
     .join('+');
 }
 
-// A = 迭代前，B = 迭代后。`--anet` / `--candnet` 是旧别名。
-const BEFORE = args.get('before') ?? args.get('anet');
-const AFTER = args.get('after') ?? args.get('candnet');
-if (args.get('anet') !== undefined && args.get('before') === undefined) {
-  console.log('提示：--anet 是 --before 的旧别名（A = 迭代前）');
-}
+// A = 迭代前，B = 迭代后。
+const BEFORE = args.get('before');
+const AFTER = args.get('after');
 // 只给 --before 时 B 就是线上权重（= 迭代后），这是"拿线上权重当基准"的正常用法
 if (BEFORE !== undefined && AFTER === undefined) {
   console.log(

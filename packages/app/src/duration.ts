@@ -18,7 +18,7 @@ export const DURATIONS: ReadonlyArray<{
   { id: 'full', label: '全庄战', laps: 4 },
 ];
 
-export function lapsOf(duration: DurationId): number {
+function lapsOf(duration: DurationId): number {
   return DURATIONS.find((item) => item.id === duration)?.laps ?? 2;
 }
 

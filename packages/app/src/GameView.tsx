@@ -454,7 +454,7 @@ function SeatPanel({ state, seat, side, revealed }: SeatPanelProps) {
   );
 }
 
-export interface SettingsDialogProps {
+interface SettingsDialogProps {
   readonly preset: ConfigPreset;
   readonly keepDeadWall: boolean;
   readonly duration: DurationId;
@@ -1090,7 +1090,7 @@ function BestWinView({
   );
 }
 
-export interface GameViewProps {
+interface GameViewProps {
   readonly state: GameState;
   readonly legal: readonly Action[];
   readonly config: RuleConfig;

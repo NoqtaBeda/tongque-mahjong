@@ -1,9 +1,9 @@
 export const KIND_COUNT = 34;
 
-export const SUIT_M = 0;
-export const SUIT_P = 1;
-export const SUIT_S = 2;
-export const SUIT_Z = 3;
+const SUIT_M = 0;
+const SUIT_P = 1;
+const SUIT_S = 2;
+const SUIT_Z = 3;
 
 /**
  * 牌种编号（0..33），与天凤 / MPSZ 记号一一对应：

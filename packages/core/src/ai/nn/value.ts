@@ -5,15 +5,15 @@ import { encodeInput } from './features.ts';
 import type { EncodeInput } from './features.ts';
 
 /** 网络输出的是"本局该座位的净得分变化 / VALUE_SCALE"，用回真实分值时乘回去。 */
-export const VALUE_SCALE = 12;
+const VALUE_SCALE = 12;
 
 /** 直接用编码好的向量推理（训练/评测脚本也会用）。 */
-export function predictFromFeatures(input: Float32Array): number {
+function predictFromFeatures(input: Float32Array): number {
   return predict(NN_WEIGHTS, input) * VALUE_SCALE;
 }
 
 /** 用指定的权重推理，用于"两个网络同桌对抗"这类 A/B 实验。 */
-export function predictFromFeaturesWith(
+function predictFromFeaturesWith(
   weights: MlpWeights,
   input: Float32Array,
 ): number {

@@ -14,9 +14,9 @@
  */
 import type { YakuKey } from '../../core/src/index.ts';
 
-export type TutorialKind = '全体' | '组合' | '特殊' | '偶然';
+type TutorialKind = '全体' | '组合' | '特殊' | '偶然';
 
-export interface TutorialExample {
+interface TutorialExample {
   /** 这副牌例的实算计分，例如「清一色 6 + 清龙 2 ＝ 8 分」 */
   readonly scoring: string;
   /** 牌例本体：每个元素是一组牌 */
@@ -35,7 +35,7 @@ export interface TutorialYaku {
   readonly examples: readonly TutorialExample[];
 }
 
-export interface TutorialSection {
+interface TutorialSection {
   readonly title: string;
   readonly items: readonly TutorialYaku[];
 }
@@ -808,7 +808,7 @@ export function countsForGate(item: TutorialYaku): boolean {
   if (item.kind === '偶然' && item.points === 1) return false;
   return true;
 }
-export interface TutorialOverviewRow {
+interface TutorialOverviewRow {
   readonly points: number;
   readonly items: readonly TutorialYaku[];
   /** 这一行全是「不能用于起和」的番种（界面上会在数字左侧加 info 图标） */

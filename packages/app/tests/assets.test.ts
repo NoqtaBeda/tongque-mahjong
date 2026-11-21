@@ -3,14 +3,18 @@ import { describe, it } from 'node:test';
 import { KIND_COUNT } from '../../core/src/index.ts';
 import {
   allAssetSources,
+  clearAssetCache,
   needsPreload,
   preloadAssets,
   tileSources,
   tileSrc,
+  tileUrl,
 } from '../src/assets.ts';
 
 describe('素材预加载', () => {
   it('牌面素材覆盖全部牌种，且都是 <base>tiles/xxx.svg', () => {
+    // 其它测试文件可能已经预载过（同进程共享模块状态），先清干净
+    clearAssetCache();
     const sources = tileSources();
     assert.equal(sources.length, KIND_COUNT);
     assert.equal(new Set(sources).size, KIND_COUNT, '不应有重复地址');
@@ -21,9 +25,10 @@ describe('素材预加载', () => {
         `地址格式异常：${url}`,
       );
     }
-    // 与单张取址保持一致
+    // 预载前 tileSrc 回落到网络地址
     for (let kind = 0; kind < KIND_COUNT; kind += 1) {
-      assert.equal(sources[kind], tileSrc(kind));
+      assert.equal(sources[kind], tileUrl(kind));
+      assert.equal(tileSrc(kind), tileUrl(kind));
     }
   });
 

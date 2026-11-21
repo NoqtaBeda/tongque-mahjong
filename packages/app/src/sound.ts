@@ -86,7 +86,7 @@ function meldCount(state: GameState): number {
   return total;
 }
 
-export type SoundCue = 'win' | 'drain' | 'discard' | 'call';
+type SoundCue = 'win' | 'drain' | 'discard' | 'call';
 
 /**
  * 由前后两个局面推断这一步该放什么音效。

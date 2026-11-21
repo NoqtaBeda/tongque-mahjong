@@ -21,13 +21,13 @@ const FLAGS: Readonly<Record<string, WinFlags>> = {
 };
 
 /** 一组牌是不是杠（四张完全一样） */
-export function isKanGroup(group: string): boolean {
+function isKanGroup(group: string): boolean {
   const tiles = parseTiles(group);
   return tiles.length === 4 && tiles.every((tile) => tile === tiles[0]);
 }
 
 /** 把教程里的一副牌例还原成引擎的输入（杠拆成副露） */
-export function buildWinInput(item: TutorialYaku, groups: readonly string[]) {
+function buildWinInput(item: TutorialYaku, groups: readonly string[]) {
   const concealed = new Uint8Array(34);
   const melds: Meld[] = [];
   for (const group of groups) {
@@ -55,7 +55,7 @@ export function buildWinInput(item: TutorialYaku, groups: readonly string[]) {
 }
 
 /** 把引擎结果写成教程里显示的那行文字 */
-export function formatScoring(
+function formatScoring(
   hits: readonly { name: string; points: number }[],
   score: number,
   rawSum: number,

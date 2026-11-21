@@ -20,7 +20,7 @@ export interface MlpWeights {
   readonly b3: Float32Array;
 }
 
-export interface MlpActivation {
+interface MlpActivation {
   readonly input: Float32Array;
   readonly z1: Float32Array;
   readonly a1: Float32Array;
