@@ -60,19 +60,13 @@ describe('拆解枚举', () => {
     assert.ok(patterns.some((p) => p.type === 'sevenPairs'));
   });
 
-  it('龙七对受配置控制', () => {
+  it('四张相同的牌不能当两对（不支持龙七对）', () => {
     const text = '1111s 22s 33s 44s 55s 66s';
-    const strict = decompose(hand(text), [], makeConfig({ rounds: 4 }));
+    const patterns = decompose(hand(text), [], makeConfig({ rounds: 4 }));
     assert.ok(
-      !strict.some((p) => p.type === 'sevenPairs'),
-      '默认不承认重复对子',
+      !patterns.some((p) => p.type === 'sevenPairs'),
+      '四张 + 六个对子不能和七对子',
     );
-    const loose = decompose(
-      hand(text),
-      [],
-      makeConfig({ rounds: 4, sevenPairsQuadAsTwoPairs: true }),
-    );
-    assert.ok(loose.some((p) => p.type === 'sevenPairs'));
   });
 
   it('十三幺', () => {

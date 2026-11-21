@@ -113,15 +113,16 @@ export function standardShanten(concealed: Hand, meldCount: number): number {
   return 8 - 2 * meldCount - bestScore;
 }
 
-/** 七对子向听数；`龙七对` 未开启时四张同牌只算一个对子。 */
-export function sevenPairsShanten(concealed: Hand, cfg: RuleConfig): number {
+/** 七对子向听数；四张同牌只算一个对子（本规则不支持龙七对）。 */
+export function sevenPairsShanten(concealed: Hand): number {
   let pairs = 0;
   let kinds = 0;
   for (let kind = 0; kind < KIND_COUNT; kind += 1) {
     const count = concealed[kind];
     if (count === 0) continue;
     kinds += 1;
-    if (count === 4 && !cfg.sevenPairsQuadAsTwoPairs) pairs += 1;
+    // 不支持龙七对：四张同牌只算一个对子
+    if (count === 4) pairs += 1;
     else pairs += Math.floor(count / 2);
   }
   if (pairs > 7) pairs = 7;
@@ -157,7 +158,7 @@ export function shantenOf(
   // 七对子 / 十三幺 都要求门清
   const sevenPairs =
     meldCount === 0 && cfg.allowSevenPairs
-      ? sevenPairsShanten(concealed, cfg)
+      ? sevenPairsShanten(concealed)
       : null;
   const thirteenOrphans =
     meldCount === 0 && cfg.allowThirteenOrphans

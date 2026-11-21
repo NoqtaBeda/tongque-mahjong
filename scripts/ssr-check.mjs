@@ -20,7 +20,8 @@ const { decodeState, encodeState } =
 const core = await import('../.ssr/packages/core/src/index.js');
 const ai = await import('../.ssr/packages/core/src/ai/index.js');
 const { YAKU } = await import('../.ssr/packages/core/src/yaku.js');
-const { TUTORIAL_ITEMS } = await import('../.ssr/packages/app/src/tutorial.js');
+const { TUTORIAL_ITEMS, TUTORIAL_ROUTES } =
+  await import('../.ssr/packages/app/src/tutorial.js');
 const { LoadingScreen } =
   await import('../.ssr/packages/app/src/LoadingScreen.js');
 
@@ -455,6 +456,22 @@ assert.equal(
   50,
   `番种表应当有 50 条，实际 ${tutorialBlocks} 条`,
 );
+// 8 条主线的可视化：8 张卡片 + 通用加成一行
+assert.equal(
+  (tutorialHtml.match(/class="tut-route"/g) ?? []).length,
+  8,
+  '教程应有 8 条主线卡片',
+);
+assert.equal(
+  (tutorialHtml.match(/class="tut-route-badge"/g) ?? []).length,
+  8,
+  '每条主线应有 A~H 徽标',
+);
+assert.ok(
+  tutorialHtml.includes('tut-routes-addon'),
+  '主线下方应列出「通用加成」',
+);
+
 for (const name of Object.values(YAKU).map((yaku) => yaku.name)) {
   assert.ok(tutorialHtml.includes(name), `番种表缺少「${name}」`);
 }
@@ -470,9 +487,10 @@ assert.equal(
   `高亮数量应等于描述里写了该限制的条目数（${expectHighlights}）`,
 );
 // 描述里的 \n 要渲染成换行（镜同就靠它把 A1/A2 那半句另起一行）
-const expectedBreaks = TUTORIAL_ITEMS.filter((item) =>
-  item.description.includes('\n'),
-).length;
+// 番种描述的 \n + 主线 summary 的 \n 都要渲染成换行
+const expectedBreaks =
+  TUTORIAL_ITEMS.filter((item) => item.description.includes('\n')).length +
+  TUTORIAL_ROUTES.filter((route) => route.summary.includes('\n')).length;
 const renderedBreaks = (tutorialHtml.match(/<br\/?>/g) ?? []).length;
 assert.equal(
   renderedBreaks,
@@ -492,8 +510,13 @@ assert.equal(
   1,
   '「不能起和」的行应当恰好有一个 info 图标',
 );
+// 只统计「一览表」里的 tag：8 条主线卡片也用 tut-tag 样式，不能混进来
+const overviewStart = tutorialHtml.indexOf('class="tut-overview"');
+const overviewEnd = tutorialHtml.indexOf('</table>', overviewStart);
+assert.ok(overviewStart >= 0 && overviewEnd > overviewStart, '找不到一览表');
+const overviewHtml = tutorialHtml.slice(overviewStart, overviewEnd);
 const overviewTags = [
-  ...tutorialHtml.matchAll(/class="tut-tag[^"]*"[^>]*>([^<]*)</g),
+  ...overviewHtml.matchAll(/class="tut-tag[^"]*"[^>]*>([^<]*)</g),
 ].map((m) => m[1]);
 assert.equal(
   overviewTags.length,

@@ -50,7 +50,7 @@ export function decompose(
   }
 
   if (melds.length === 0 && handTotal(concealed) === 14) {
-    if (cfg.allowSevenPairs && isSevenPairs(concealed, cfg)) {
+    if (cfg.allowSevenPairs && isSevenPairs(concealed)) {
       patterns.push({ type: 'sevenPairs', sets: [], pair: null });
     }
     if (cfg.allowThirteenOrphans && isThirteenOrphans(concealed)) {
@@ -109,7 +109,7 @@ function collectSets(
   }
 }
 
-export function isSevenPairs(hand: Hand, cfg: RuleConfig): boolean {
+export function isSevenPairs(hand: Hand): boolean {
   let pairs = 0;
   for (let kind = 0; kind < KIND_COUNT; kind += 1) {
     const count = hand[kind];
@@ -117,8 +117,8 @@ export function isSevenPairs(hand: Hand, cfg: RuleConfig): boolean {
     if (count === 2) {
       pairs += 1;
     } else if (count === 4) {
-      if (!cfg.sevenPairsQuadAsTwoPairs) return false;
-      pairs += 2;
+      // 不支持龙七对：四张相同的牌只算一个对子，凑不满 7 对
+      return false;
     } else {
       return false;
     }

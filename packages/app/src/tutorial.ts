@@ -685,7 +685,7 @@ export const TUTORIAL_SECTIONS: readonly TutorialSection[] = [
         name: '七对子',
         points: 2,
         kind: '特殊',
-        description: '手牌包含 7 组对子。不计入铳责。',
+        description: '手牌包含 7 组互异的对子。不计入铳责。',
         examples: [
           {
             scoring: '七对子 2 ＝ 2 分',
@@ -840,3 +840,183 @@ export const TUTORIAL_OVERVIEW: readonly TutorialOverviewRow[] = (() => {
   }
   return rows;
 })();
+
+// ---------------------------------------------------------------- 8 条主线
+
+/**
+ * 上手时的 8 条主线，和 `规则文档.md`「五、上手指南」一一对应。
+ *
+ * 只列「做牌路线」，不含杠与偶然类（那些不构成主线，任何路线都能叠）。
+ * 单测会校验：50 个番种每一个都恰好落在某一条主线或附加组里。
+ */
+export interface TutorialRoute {
+  /** A~H */
+  readonly id: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly items: readonly TutorialYaku[];
+}
+
+/**
+ * `summary` 支持两种轻量标记（和番种描述同一套渲染）：
+ *   - `\n` 手动换行（卡片窄、想控制断句时用）
+ *   - `**xx**` 加粗
+ */
+
+const ROUTE_DEFS: readonly {
+  readonly id: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly keys: readonly YakuKey[];
+}[] = [
+  {
+    id: 'A',
+    title: '一色全体',
+    summary:
+      '只留一种花色的数牌。',
+    keys: ['hunyise', 'qingyise'],
+  },
+  {
+    id: 'B',
+    title: '一色组合',
+    summary:
+      '同花色里做三组以上数字递增的顺子。',
+    keys: ['qinglong', 'sanlianhuan', 'sanbugao'],
+  },
+  {
+    id: 'C',
+    title: '三色组合',
+    summary: '三种花色做同一个数字的顺子或刻子。',
+    keys: ['sanse-tongshun', 'xiao-san-se-tongke', 'sanse-tongke'],
+  },
+  {
+    id: 'D',
+    title: '幺九',
+    summary: '每副面子都带 1、9 或字牌。',
+    keys: ['hun-quan-dai-yaojiu', 'chun-quan-dai-yaojiu'],
+  },
+  {
+    id: 'E',
+    title: '聚数',
+    summary: '只用连续的 4 种或更少的数字。',
+    keys: ['jusishu', 'jusanshu'],
+  },
+  {
+    id: 'F',
+    title: '对称',
+    summary: '两个花色各做两组，花色间数字对称。',
+    keys: ['jingtong'],
+  },
+  {
+    id: 'G',
+    title: '对子刻子',
+    summary: '不靠顺子，全靠刻子与对子。',
+    keys: ['pengpenghe', 'qiduizi'],
+  },
+  {
+    id: 'H',
+    title: '1 + 1 凑番',
+    summary: '选两个以上的 1 分小番把分数凑到 2 番。',
+    keys: [
+      'queyimen',
+      'juwushu',
+      'yibangao',
+      'ertongke',
+      'menfengke',
+      'sanyuanke',
+    ],
+  },
+];
+
+/**
+ * 不参与主线归类的番种：杠与和牌时机。
+ *
+ * 这些番种不构成做牌路线（只算主线过程中的分数波动），
+ * 等频采样时不作为分类维度；界面上只在「通用加成」里示意前两个。
+ */
+export const TUTORIAL_ROUTE_EXCLUDED_KEYS: readonly YakuKey[] = [
+  'yigang',
+  'lianggang',
+  'sangang',
+  'sigang',
+  'gangshang-kaihua',
+  'qianggang',
+  'miaoshou-huichun',
+  'haidi-laoyue',
+  'tianhe',
+  'dihe',
+];
+
+/** 界面上「通用加成」只示意两个：一杠、两杠（后面用省略号带过） */
+const ROUTE_ADDON_KEYS: readonly YakuKey[] = ['yigang', 'lianggang'];
+
+/**
+ * 补充归类：`ROUTE_DEFS[].keys` 是教程里展示的代表番种（精选过），
+ * 这里补齐「和牌后引擎判定的番种 → 主线」的完整映射，供等频采样用。
+ *
+ * 展示与采样分开维护：教程卡片不会因为补全归类而变长。
+ */
+const ROUTE_EXTRA_KEYS: Readonly<Record<string, readonly YakuKey[]>> = {
+  A: ['jiulian'],
+  B: ['yise-santongshun', 'silianhuan', 'sibugao', 'yise-sitongshun'],
+  C: [],
+  D: ['hun-yaojiu', 'qing-yaojiu', 'shisansan'],
+  E: ['juliangshu'],
+  F: ['liangbangao'],
+  G: ['sanlianke', 'silianke', 'ziyise'],
+  H: [
+    'xiao-sanyuan',
+    'da-sanyuan',
+    'xiao-san-feng-ke',
+    'san-feng-ke',
+    'xiao-sixi',
+    'da-sixi',
+  ],
+};
+
+const ITEM_BY_KEY = new Map(TUTORIAL_ITEMS.map((item) => [item.key, item]));
+
+function itemsOf(keys: readonly YakuKey[]): TutorialYaku[] {
+  const items: TutorialYaku[] = [];
+  for (const key of keys) {
+    const item = ITEM_BY_KEY.get(key);
+    if (item !== undefined) items.push(item);
+  }
+  return items;
+}
+
+export const TUTORIAL_ROUTES: readonly TutorialRoute[] = ROUTE_DEFS.map(
+  (route) => ({
+    id: route.id,
+    title: route.title,
+    summary: route.summary,
+    items: itemsOf(route.keys),
+  }),
+);
+
+/** 杠与偶然类：不构成主线，但任何主线都能叠 */
+export const TUTORIAL_ROUTE_ADDONS: readonly TutorialYaku[] =
+  itemsOf(ROUTE_ADDON_KEYS);
+
+/** 某条主线完整覆盖的 key：展示用的代表番种 + 补充归类 */
+export function routeAllKeys(id: string): readonly YakuKey[] {
+  const route = ROUTE_DEFS.find((item) => item.id === id);
+  if (route === undefined) return [];
+  return [...route.keys, ...(ROUTE_EXTRA_KEYS[id] ?? [])];
+}
+
+/** 完整归类：id → 该主线覆盖的全部番种（等频采样按这个分类） */
+export const TUTORIAL_ROUTE_CLASSIFICATION: readonly {
+  readonly id: string;
+  readonly title: string;
+  readonly keys: readonly YakuKey[];
+}[] = ROUTE_DEFS.map((route) => ({
+  id: route.id,
+  title: route.title,
+  keys: routeAllKeys(route.id),
+}));
+
+/** 8 条主线完整覆盖的全部 key（不含杠/偶然这类不参与归类的番种） */
+export const TUTORIAL_ROUTE_ALL_KEYS: readonly YakuKey[] = ROUTE_DEFS.flatMap(
+  (route) => [...route.keys, ...(ROUTE_EXTRA_KEYS[route.id] ?? [])],
+);

@@ -54,11 +54,8 @@ describe('向听数：标准型', () => {
 
 describe('向听数：七对子 / 十三幺', () => {
   it('七对子', () => {
-    assert.equal(
-      sevenPairsShanten(hand('11s 22s 44s 55s 77s 88s 99s'), cfg),
-      -1,
-    );
-    assert.equal(sevenPairsShanten(hand('11s 22s 44s 55s 77s 88s 9s'), cfg), 0);
+    assert.equal(sevenPairsShanten(hand('11s 22s 44s 55s 77s 88s 99s')), -1);
+    assert.equal(sevenPairsShanten(hand('11s 22s 44s 55s 77s 88s 9s')), 0);
   });
 
   it('十三幺', () => {

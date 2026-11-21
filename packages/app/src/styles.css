@@ -1,3 +1,97 @@
+/* ---------------------------------------------------------------- 8 条主线 */
+.tut-routes {
+  margin: 14px 0 26px;
+}
+
+.tut-routes-title {
+  margin: 0 0 8px;
+}
+
+.tut-routes-hint {
+  /* 和标题、卡片之间都留出呼吸空间，别挤在一起 */
+  margin: 12px 0 20px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  opacity: 0.72;
+}
+
+.tut-route-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+.tut-route {
+  padding: 10px 12px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.tut-route-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.tut-route-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid var(--accent, #7c9a86);
+  color: var(--accent, #7c9a86);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tut-route-name {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.tut-route-summary {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.65;
+  opacity: 0.78;
+  /* 中文折行：行首不留标点，尽量不出现孤字 */
+  line-break: strict;
+  word-break: normal;
+  text-wrap: pretty;
+}
+
+.tut-route-yaku {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tut-routes-addon {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+}
+
+.tut-routes-addon-label {
+  font-weight: 700;
+  color: var(--accent, #7c9a86);
+}
+
+.tut-routes-addon-ellipsis {
+  opacity: 0.5;
+  letter-spacing: 1px;
+}
+
 /* ---------------------------------------------------------------- 加载界面 */
 .loading-screen {
   position: fixed;

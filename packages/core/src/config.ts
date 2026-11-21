@@ -23,8 +23,6 @@ export interface RuleConfig {
    */
   readonly duplicateWalls: boolean;
   readonly allowSevenPairs: boolean;
-  /** 七对子是否允许重复对子（龙七对）。 */
-  readonly sevenPairsQuadAsTwoPairs: boolean;
   readonly allowThirteenOrphans: boolean;
   /** 总局数；必须为玩家人数的整数倍（每风圈每人一局坐庄）。 */
   readonly rounds: number;
@@ -37,7 +35,6 @@ const BASE_CONFIG: RuleConfig = {
   keepDeadWall: true,
   duplicateWalls: false,
   allowSevenPairs: true,
-  sevenPairsQuadAsTwoPairs: false,
   allowThirteenOrphans: true,
   rounds: 4,
 };

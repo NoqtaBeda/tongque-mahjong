@@ -13,6 +13,8 @@ import {
   RULE_INTRO,
   TUTORIAL_ITEMS,
   TUTORIAL_OVERVIEW,
+  TUTORIAL_ROUTE_ADDONS,
+  TUTORIAL_ROUTES,
   TUTORIAL_SECTIONS,
 } from './tutorial.ts';
 import { sidewaysIndex } from './meld.ts';
@@ -841,6 +843,63 @@ export function TutorialDialog({ onClose }: { readonly onClose: () => void }) {
               ))}
             </tbody>
           </table>
+
+          {/* 8 条主线：上手时按这个顺序找牌 */}
+          <section className="tut-routes">
+            <h4 className="tut-routes-title">
+              8 条主线（上手时按这个顺序找牌）
+            </h4>
+            <p className="tut-routes-hint">
+              绝大多数和牌都能归到下面 8
+              条路线之一。先看配牌像哪条，再决定留什么牌；
+              多条主线能复合时得分更高。
+            </p>
+            <div className="tut-route-grid">
+              {TUTORIAL_ROUTES.map((route) => (
+                <div className="tut-route" key={`route-${route.id}`}>
+                  <div className="tut-route-head">
+                    <span className="tut-route-badge">{route.id}</span>
+                    <span className="tut-route-name">{route.title}</span>
+                  </div>
+                  <p className="tut-route-summary">
+                    {renderText(route.summary)}
+                  </p>
+                  <div className="tut-route-yaku">
+                    {route.items.map((item) => (
+                      <span
+                        className={`tut-tag${needsGlow(item.points) ? ' tut-tag-glow' : ''}`}
+                        key={`route-${route.id}-${item.key}`}
+                        style={
+                          {
+                            '--yaku': yakuColorOf(item.points),
+                          } as React.CSSProperties
+                        }
+                      >
+                        {item.name} {item.points}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="tut-routes-addon">
+              <span className="tut-routes-addon-label">通用加成</span>
+              {TUTORIAL_ROUTE_ADDONS.map((item) => (
+                <span
+                  className="tut-tag tut-tag-muted"
+                  key={`route-addon-${item.key}`}
+                  style={
+                    {
+                      '--yaku': yakuColorOf(item.points),
+                    } as React.CSSProperties
+                  }
+                >
+                  {item.name} {item.points}
+                </span>
+              ))}
+              <span className="tut-routes-addon-ellipsis">…</span>
+            </div>
+          </section>
 
           {TUTORIAL_SECTIONS.map((section) => (
             <section className="tutorial-block" key={section.title}>
