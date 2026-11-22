@@ -44,12 +44,25 @@ def load_with_actions(files):
     for path in files:
         with open(path, "rb") as handle:
             raw = handle.read()
-        count, dim = struct.unpack_from("<II", raw, 0)
-        offset = 8
-        groups = np.frombuffer(raw, dtype="<u4", count=count, offset=offset).astype(
-            np.int64
-        )
-        offset += count * 4
+        # v2：magic / count / dim / flags / groups / weights / body
+        # v1：count / dim / groups / body
+        magic = struct.unpack_from("<I", raw, 0)[0]
+        if magic == 0x54513032:
+            count, dim, flags = struct.unpack_from("<III", raw, 4)
+            offset = 16
+            groups = np.frombuffer(
+                raw, dtype="<u4", count=count, offset=offset
+            ).astype(np.int64)
+            offset += count * 4
+            if flags & 1:
+                offset += count * 4
+        else:
+            count, dim = struct.unpack_from("<II", raw, 0)
+            offset = 8
+            groups = np.frombuffer(
+                raw, dtype="<u4", count=count, offset=offset
+            ).astype(np.int64)
+            offset += count * 4
         body = np.frombuffer(
             raw, dtype="<f4", count=count * (dim + 1), offset=offset
         ).astype(np.float32)

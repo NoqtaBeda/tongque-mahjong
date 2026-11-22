@@ -25,6 +25,12 @@ export interface EncodeInput {
    * 这样旧的调用方不传也能跑（只是那 7 维没有信息量）。
    */
   readonly threat?: ThreatInput;
+  /**
+   * 8 条主线的进行度（各 0..1，缺省填 0）。
+   * 用最大值表达"这手牌在走哪条线"，让网络分得清镜同/一色三同顺这类
+   * 单一 `potential` 标量表达不出的差异。
+   */
+  readonly routeProgress?: readonly number[] | Float32Array;
 }
 
 interface ThreatInput {

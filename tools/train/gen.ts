@@ -7,11 +7,14 @@
 // 并行时每片写 `xxx.shard<i>.bin`，全部结束后自动合并成一个文件并发完就删分片。
 // 分片的 group id 带高位偏移，合并后训练时按 group 切验证集仍然安全。
 import {
+  closeSync,
   existsSync,
+  openSync,
   mkdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { runShards } from '../../scripts/parallel.ts';
@@ -40,6 +43,14 @@ import {
   encodeInput,
   NN_FEATURE_DIM,
 } from '../../packages/core/src/ai/nn/features.ts';
+import { decodeWeights } from '../../packages/core/src/ai/nn/model.ts';
+import { predict } from '../../packages/core/src/ai/nn/mlp.ts';
+import {
+  NN_DIM0,
+  NN_DIM1,
+  NN_DIM2,
+  NN_WEIGHTS_B64,
+} from '../../packages/core/src/ai/nn/weights.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
@@ -83,6 +94,16 @@ const ANCHORS = Number(args.get('anchors') ?? 1);
  * even = 等距（覆盖与实战一致）。默认 even——迭代 1 复盘发现 tail 会让网络只学到终局局面。
  */
 const TAIL = args.get('tail') === '1';
+/**
+ * 非对称责任权重：和牌者权重全 1，放铳者按 γ^d 衰减（不删样本），第三家权重 1。
+ * 默认关闭（= 全部权重 1，与迭代 6 的口径一致）。
+ */
+const ASYM = args.get('asym') === '1';
+/**
+ * 放铳者衰减权重的下限：避免早巡样本被 gamma^d 压到接近 0（等价于删样本，
+ * 会让网络只学到终局局面）。0.25 表示早巡的责任按 1/4 计入。
+ */
+const FLOOR = Number(args.get('floor') ?? 0.25);
 /** 路线化探索：每本场轮流指定一条主线，并在该本场给这条线的番种加权 */
 const ROUTE_BALANCE = args.get('route-balance') === '1';
 /**
@@ -127,6 +148,20 @@ const ROUTE_KEYS: readonly (readonly string[])[] = [
   ],
 ];
 /** 文件格式版本：2 = magic + 权重列 */
+/**
+ * n 步自举：离终局超过 N 个决策的样本，不用终局净得分当标签，
+ * 改用「N 步之后那个局面的价值网络估计」——期望值不变（γ=1），方差大幅降低。
+ * 0 = 关闭（保持纯蒙特卡洛标签）。
+ */
+const BOOTSTRAP = Number(args.get('bootstrap') ?? 0);
+const VALUE_NET =
+  BOOTSTRAP > 0
+    ? decodeWeights(NN_DIM0, NN_DIM1, NN_DIM2, NN_WEIGHTS_B64)
+    : null;
+/** 用价值网络估计某个局面的本场期望净得分（网络输出是「分 / 12」） */
+function bootstrapValue(features: Float32Array): number {
+  return VALUE_NET === null ? 0 : predict(VALUE_NET, features) * 12;
+}
 const FORMAT_VERSION = 2;
 const FORMAT_MAGIC = 0x54513032; // "TQ02"
 /**
@@ -354,10 +389,12 @@ for (let game = firstGame; game < lastGame; game += 1) {
 
       // 该座位在这个决策之后还有几个自己的决策（0 = 最后一个决策）
       const distance = new Array<number>(pending.length).fill(0);
+      const seatDistanceIndex = new Map<string, number>();
       const after = [0, 0, 0, 0];
       for (let index = pending.length - 1; index >= 0; index -= 1) {
         const seat = pending[index].seat;
         distance[index] = after[seat];
+        seatDistanceIndex.set(`${seat}:${after[seat]}`, index);
         after[seat] += 1;
       }
 
@@ -389,10 +426,18 @@ for (let game = firstGame; game < lastGame; game += 1) {
               keep.push(own[index]);
             }
           } else {
-            // 默认：等距，保证训练分布和实战一致（tail 会丢掉中前盘状态）
-            for (let index = 0; index < quota; index += 1) {
-              keep.push(own[Math.floor((index * own.length) / quota)]);
+            // 默认：等距，保证训练分布和实战一致（tail 会丢掉中前盘状态）。
+            // 但最后一个决策一定取——放铳那一打就是 d=0，非对称权重全靠它。
+            const head = own.slice(0, own.length - 1);
+            const headQuota = Math.max(0, quota - 1);
+            for (let index = 0; index < headQuota; index += 1) {
+              keep.push(
+                head[
+                  Math.floor((index * head.length) / Math.max(1, headQuota))
+                ],
+              );
             }
+            keep.push(own[own.length - 1]);
           }
         }
       } else if (pending.length <= PER_ROUND) {
@@ -407,11 +452,33 @@ for (let game = firstGame; game < lastGame; game += 1) {
       for (const index of keep) {
         const entry = pending[index];
         const change = delta[entry.seat];
-        // 标签保持「本场净得分」的原量纲（V 的尺度不变，不用重扫 pw）；
-        // 离终局越远，责任越不确定 → 用权重 gamma^d 衰减，超过地平线直接丢弃。
-        const label = change;
-        const weight = change === 0 ? 1 : Math.pow(GAMMA, distance[index]);
-        if (change !== 0 && distance[index] > HORIZON) continue;
+        // 标签保持「本场净得分」的原量纲（V 的尺度不变，不用重扫 pw）。
+        //
+        // 非对称责任（--asym=1）：
+        //   和牌者  每一打共享功劳 → 权重全 1
+        //   放铳者  只有放铳那一打是主责，往前按 γ^d 衰减，**一行都不删**（覆盖优先）
+        //   第三家  权重 1、标签 0，保留锚点
+        // 不开 asym 时退回旧行为（有分数变化的座位统一衰减 + 超过地平线丢弃）。
+        let label = change;
+        let weight = 1;
+        if (ASYM) {
+          if (change < 0) {
+            weight = Math.max(FLOOR, Math.pow(GAMMA, distance[index]));
+          }
+        } else if (change !== 0) {
+          weight = Math.pow(GAMMA, distance[index]);
+          if (distance[index] > HORIZON) continue;
+        }
+        // n 步自举：离终局太远的局面，标签换成「N 步之后」的价值估计
+        if (BOOTSTRAP > 0 && change !== 0 && distance[index] > BOOTSTRAP) {
+          const anchorDistance = distance[index] - BOOTSTRAP;
+          const anchor = seatDistanceIndex.get(
+            `${entry.seat}:${anchorDistance}`,
+          );
+          if (anchor !== undefined) {
+            label = bootstrapValue(pending[anchor].features);
+          }
+        }
         labelled.push({
           features: entry.features,
           target: label,
@@ -562,7 +629,17 @@ function mergeShards(count: number, dim: number): void {
   }
 
   mkdirSync(dirname(OUT), { recursive: true });
-  writeFileSync(OUT, Buffer.concat([head, weights, body]));
+  // 单次 writeFileSync 受 2GB 限制（100k 局合并后 >3GB），改成逐片流式追加
+  {
+    const fd = openSync(OUT, 'w');
+    try {
+      writeSync(fd, head, 0, head.length);
+      writeSync(fd, weights, 0, weights.length);
+      writeSync(fd, body, 0, body.length);
+    } finally {
+      closeSync(fd);
+    }
+  }
   writeFileSync(OUT.replace(/\.bin$/, '.act.bin'), actions);
   for (let index = 0; index < count; index += 1) {
     rmSync(shardPath(index), { force: true });
