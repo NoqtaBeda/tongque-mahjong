@@ -26,6 +26,13 @@ export interface EncodeInput {
    */
   readonly threat?: ThreatInput;
   /**
+   * 屏蔽局面级维度（76..83：牌山余量 / 庄家 / 座位风 / 分数 / 巡目）。
+   *
+   * 动机：这些维度在一次决策内是常数，对"选哪张"毫无区分度，但网络会把大量容量
+   * 花在它们身上去拟合"本场结局"。屏蔽后网络只能从手牌本身的差异里学价值。
+   */
+  readonly maskPosition?: boolean;
+  /**
    * 8 条主线的进行度（各 0..1，缺省填 0）。
    * 用最大值表达"这手牌在走哪条线"，让网络分得清镜同/一色三同顺这类
    * 单一 `potential` 标量表达不出的差异。
@@ -106,6 +113,11 @@ export function encodeInput(input: EncodeInput): Float32Array {
   cursor += 1;
   out[cursor] = Math.min(1, input.round / 16);
   cursor += 1;
+
+  // 局面级维度：--mask-position 时清零（训练与实战必须一致）
+  if (input.maskPosition === true) {
+    for (let dim = 76; dim <= 83; dim += 1) out[dim] = 0;
+  }
 
   // 84..117 场上已打明的牌
   for (let kind = 0; kind < KIND_COUNT; kind += 1) {

@@ -94,6 +94,8 @@ export interface DiscardOptions {
   readonly branch?: number;
   /** 潜力项用哪种模型：手写启发式，或训练出来的神经网络 */
   readonly valueModel?: 'heuristic' | 'nn' | 'heuristic+nn';
+  /** 屏蔽局面级特征（见 EncodeInput.maskPosition） */
+  readonly maskPosition?: boolean;
   /** 对指定番种的额外偏好（见 biasScore）；不传表示都不偏 */
   readonly yakuBias?: YakuBias;
   /** 指定网络权重（A/B 实验用），不传就用线上权重 */

@@ -148,6 +148,8 @@ function tuned(level: AiLevel, isB: boolean): AiProfile {
     },
     valueModel:
       nnMode === '2' ? 'heuristic+nn' : nnMode === '1' ? 'nn' : base.valueModel,
+    // 屏蔽局面级特征：只作用于 B 侧（用来验证"训练时也屏蔽"的模型）
+    maskPosition: args.get('mask-position') === '1' ? true : base.maskPosition,
     lookahead: noLook ? 0 : look ? 1 : base.lookahead,
     lookaheadWeight: lw ?? base.lookaheadWeight,
     branch: branch ?? base.branch,

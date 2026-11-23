@@ -12,6 +12,8 @@ export interface AiProfile {
   readonly weights: DiscardWeights;
   /** 潜力项用哪种模型 */
   readonly valueModel: 'heuristic' | 'nn' | 'heuristic+nn';
+  /** 屏蔽局面级特征（训练与实战必须一致） */
+  readonly maskPosition?: boolean;
   /** 前瞻步数；0 表示只看静态评估 */
   readonly lookahead: 0 | 1;
   /** 前瞻分数在总价值里的权重 */

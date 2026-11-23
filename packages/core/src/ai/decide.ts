@@ -249,6 +249,7 @@ function decideDiscard(
     lookaheadWeight: profile.lookaheadWeight,
     branch: profile.branch,
     valueModel: profile.valueModel,
+    maskPosition: profile.maskPosition,
     yakuBias: options.yakuBias ?? profile.yakuBias,
     biasGate: options.biasGate ?? profile.biasGate,
     nnWeights: options.nnWeights ?? profile.nnWeights,

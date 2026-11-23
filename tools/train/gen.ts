@@ -99,6 +99,8 @@ const TAIL = args.get('tail') === '1';
  * 默认关闭（= 全部权重 1，与迭代 6 的口径一致）。
  */
 const ASYM = args.get('asym') === '1';
+/** 屏蔽局面级特征（76..83），训练一个只看手牌差异的价值网络 */
+const MASK_POSITION = args.get('mask-position') === '1';
 /**
  * 放铳者衰减权重的下限：避免早巡样本被 gamma^d 压到接近 0（等价于删样本，
  * 会让网络只学到终局局面）。0.25 表示早巡的责任按 1/4 计入。
@@ -308,6 +310,7 @@ function playRound(
           score: current.scores[actor],
           shanten: shantenOf(after, melds.length, cfg).value,
           ukeire: improvingTiles(after, melds, cfg, visible).count,
+          maskPosition: MASK_POSITION,
           potential: potentialScore(
             extractFeatures(after, melds, observation.seatWind),
           ),
@@ -329,6 +332,7 @@ function playRound(
           shanten,
           ukeire,
           potential,
+          maskPosition: MASK_POSITION,
         }),
       });
     }
